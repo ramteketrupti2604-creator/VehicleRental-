@@ -1,0 +1,55 @@
+.bd-wrapper { 
+  min-height: auto; 
+  padding: 12px; 
+  display: flex; 
+  justify-content: center; 
+  background: #eef4ff; 
+}
+.bd-card { 
+  width: 100%; 
+  max-width: 780px; 
+  background: #fff; 
+  border-radius: 12px; 
+  overflow: hidden; 
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08); 
+}
+.bd-success-header { 
+  background: linear-gradient(90deg, #0f2a64, #1e4fd8); 
+  color: #fff; 
+  text-align: center; 
+  padding: 14px 10px; 
+}
+.bd-success-header .check-circle { 
+  width: 28px; height: 28px; 
+  background: #22c55e; 
+  border-radius: 50%; 
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center; 
+  font-weight: 900; 
+  margin-bottom: 4px; 
+}
+.bd-success-header h1 { font-size: 16px; margin: 2px 0; }
+.bd-success-header .booking-id { font-size: 10px; opacity: .7; margin: 0; }
+.status-badge { font-size: 8px; background: #fff; color: #0f2a64; padding: 2px 8px; border-radius: 20px; font-weight: 800; display: inline-block; margin-top: 6px; }
+
+.bd-body { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; padding: 12px; }
+.bd-left img { width: 100%; height: 160px; object-fit: cover; border-radius: 8px; }
+.vehicle-info h2 { font-size: 14px; margin: 8px 0 2px; font-weight: 800; }
+.vehicle-info p { font-size: 11px; color: #64748b; margin: 0 0 6px; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tags span { font-size: 9px; background: #f1f5f9; padding: 3px 6px; border-radius: 4px; }
+
+.bd-right h3 { font-size: 13px; margin: 0 0 8px; font-weight: 800; }
+.summary-list .row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; }
+.summary-list .row span { color: #64748b; }
+.summary-list .divider { height: 1px; background: #e2e8f0; margin: 6px 0; }
+.summary-list .row.total b { color: #2563eb; font-size: 13px; }
+.pay-badge { background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-size: 9px; }
+.note-box { font-size: 9px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 6px; margin-top: 8px; }
+
+.bd-actions { display: flex; gap: 8px; padding: 0 12px 12px; }
+.btn-dark { flex: 1; background: #0f172a; color: #fff; text-align: center; padding: 8px; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none; }
+.btn-light { flex: 1; background: #fff; border: 1px solid #0f172a; color: #0f172a; text-align: center; padding: 8px; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none; }
+
+@media(max-width: 700px){ .bd-body{ grid-template-columns: 1fr; } .bd-left img{ height: 180px; } }
