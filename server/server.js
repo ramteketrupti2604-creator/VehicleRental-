@@ -16,14 +16,14 @@ import { protect, admin } from './middleware/authMiddleware.js';
 import Booking from "./models/bookingModel.js";
 import Vehicle from "./models/vehicleModel.js";
 import User from "./models/userModel.js";
-import { sendBookingEmail } from './utils/sendEmail.js'; // <-- EMAIL KE LIYE ADD KIYA
+import { sendBookingEmail } from './utils/sendEmail.js';
 
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 5000;
 
+// CORS FIX for Vercel
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'],
+  origin: true,
   credentials: true
 }));
 app.use(express.json());
@@ -122,10 +122,7 @@ app.post('/api/bookings', protect, async (req,res) => {
       discountAmount: discount
     });
     const populated = await Booking.findById(booking._id).populate('vehicle').populate('user','name email');
-    
-    // --- EMAIL BHEJNE KA CODE - YAHI MAIN FIX HAI ---
     try {
-      console.log("Trying to send email to:", populated.user.email);
       await sendBookingEmail({
         to: populated.user.email,
         bookingNumber: populated.bookingNumber,
@@ -137,7 +134,6 @@ app.post('/api/bookings', protect, async (req,res) => {
     } catch (emailErr) {
       console.log("Booking ho gayi par email fail:", emailErr.message);
     }
-
     res.status(201).json(populated);
   } catch(e){
     console.error(e);
@@ -207,12 +203,26 @@ app.put('/api/bookings/:id/status', protect, admin, async (req,res) => {
 });
 
 app.get('/', (req, res) => res.send('Vehicle Rental API Running... ✅ FINAL FIXED + COUPON'));
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: err.message || 'Server Error' });
-});
 
-mongoose.connect(process.env.MONGO_URI).then(() => {
-  console.log('MongoDB Connected ✅');
-  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT} - FINAL FIXED + COUPON + EMAIL ✅`));
-}).catch(err => { console.log(err); process.exit(1); });
+// VERCEL FIX: MongoDB Connection caching
+let isConnected = false;
+async function connectDB() {
+  if (isConnected) return;
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    isConnected = true;
+    console.log('MongoDB Connected ✅');
+  } catch(err) {
+    console.log(err);
+    throw err;
+  }
+}
+await connectDB();
+
+// Local ke liye listen, Vercel ke liye export
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}
+
+export default app;
