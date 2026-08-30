@@ -8,7 +8,7 @@ import { sendBookingEmail } from '../utils/sendEmail.js';
 const router = express.Router();
 
 router.get('/all-debug', async (req, res) => {
-  try { const bookings = await Booking.find({}).limit(30); res.json(bookings); } 
+  try { const bookings = await Booking.find({}).limit(30); res.json(bookings); }
   catch(e) { res.json({ error: e.message }); }
 });
 
@@ -20,28 +20,41 @@ router.get('/clean-this-car/:vehicleId', async (req, res) => {
   } catch(e) { res.status(500).json({ message: e.message }); }
 });
 
-// ===== YAHI MAIN FIX HAI - AB HAMESHA AVAILABLE BOLEGA =====
 router.post('/check-availability', async (req, res) => {
   try {
     const { vehicleId, pickupDate, returnDate, startDate, endDate } = req.body;
     const sDate = pickupDate || startDate;
     const eDate = returnDate || endDate;
-    
+
     const vehicle = await Vehicle.findById(vehicleId);
     if(!vehicle) return res.json({ available: false, message: "Vehicle not found" });
 
     const pickup = new Date(sDate);
     const returnD = new Date(eDate);
+
+    const overlapping = await Booking.findOne({
+      vehicle: vehicleId,
+      status: { $in: ['PENDING','CONFIRMED'] },
+      pickupDate: { $lt: returnD },
+      returnDate: { $gt: pickup }
+    });
+
+    if (overlapping) {
+      return res.json({
+        available: false,
+        message: `Already booked from ${overlapping.pickupDate.toDateString()} to ${overlapping.returnDate.toDateString()}`
+      });
+    }
+
     const days = Math.ceil((returnD - pickup) / (1000*60*60*24)) + 1;
-    const finalDays = days > 0 ? days : 1;
-    
-    // DB khali hai isliye direct available true
-    return res.json({ 
-      available: true, 
+    const finalDays = days > 0? days : 1;
+
+    return res.json({
+      available: true,
       message: "Available",
-      rentalDays: finalDays, 
-      pricePerDay: vehicle.pricePerDay, 
-      totalAmount: finalDays * vehicle.pricePerDay 
+      rentalDays: finalDays,
+      pricePerDay: vehicle.pricePerDay,
+      totalAmount: finalDays * vehicle.pricePerDay
     });
   } catch(err) {
     console.log(err);
@@ -49,16 +62,39 @@ router.post('/check-availability', async (req, res) => {
   }
 });
 
-// GET ke liye bhi same
 router.get('/check-availability', async (req, res) => {
   return res.json({ available: true, message: "Available" });
 });
 
+// ===== YAHI MAIN FIX HAI - PER VEHICLE CALENDAR =====
 const bookedDatesHandler = async (req, res) => {
-  res.json({ bookedDates: [], count: 0 });
+  try {
+    const vehicleId = req.params.vehicleId || req.params.id;
+    const bookings = await Booking.find({
+      vehicle: vehicleId,
+      status: { $in: ['CONFIRMED', 'PENDING'] }
+    }).select('pickupDate returnDate');
+
+    let allDates = [];
+    bookings.forEach(b => {
+      let curr = new Date(b.pickupDate);
+      let end = new Date(b.returnDate);
+      while(curr <= end) {
+        allDates.push(new Date(curr));
+        curr.setDate(curr.getDate() + 1);
+      }
+    });
+
+    // Sirf isi gaadi ki dates
+    res.json({ bookedDates: allDates, count: allDates.length });
+  } catch (err) {
+    console.log(err);
+    res.json({ bookedDates: [], count: 0 });
+  }
 };
 router.get('/vehicle/:vehicleId/booked-dates', bookedDatesHandler);
 router.get('/:vehicleId/booked-dates', bookedDatesHandler);
+router.get('/:id/booked-dates', bookedDatesHandler);
 
 router.post('/', auth, async (req, res) => {
   try {

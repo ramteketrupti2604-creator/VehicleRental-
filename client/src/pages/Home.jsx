@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { Search, MapPin, Users, Fuel, Cog, ArrowRight, IndianRupee, RotateCcw } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 export default function Home() {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ export default function Home() {
       if (minPrice!== '') params.minPrice = Number(minPrice);
       if (maxPrice!== '') params.maxPrice = Number(maxPrice);
 
-      const { data } = await axios.get('/api/vehicles', { params });
+      const { data } = await axios.get(`${API_URL}/api/vehicles`, { params });
       setVehicles(data.vehicles || []);
       setTotalPages(data.totalPages || 1);
     } catch (err) {
@@ -42,14 +44,16 @@ export default function Home() {
   };
 
   const fetchCategories = async () => {
-    const { data } = await axios.get('/api/categories');
-    setCategories(Array.isArray(data)? data : data.categories || []);
+    try {
+      const { data } = await axios.get(`${API_URL}/api/categories`);
+      setCategories(Array.isArray(data)? data : data.categories || []);
+    } catch {}
   };
 
   useEffect(() => { fetchCategories(); }, []);
   useEffect(() => {
     fetchVehicles();
-  }, [page, category, location, fuelType, transmission, sort, minPrice, maxPrice]);
+  }, [page, category, location, fuelType, transmission, sort]);
 
   const handleSearchClick = () => {
     setPage(1);
@@ -66,6 +70,7 @@ export default function Home() {
   const handleReset = () => {
     setSearch(''); setCategory(''); setLocation(''); setFuelType('');
     setTransmission(''); setMinPrice(''); setMaxPrice(''); setSort(''); setPage(1);
+    setTimeout(() => { window.location.reload(); }, 100);
   };
 
   return (
@@ -126,11 +131,12 @@ export default function Home() {
                 <option value="">All Transmission</option><option value="Manual">Manual</option><option value="Automatic">Automatic</option>
               </select>
 
-              <div className="flex items-center bg-[#f1f4f9] rounded-full px-3 h-9 gap-1">
+              <div className="flex items-center bg-[#f1f4f9] rounded-full px-3 h-9 gap-1 border-2 focus-within:border-blue-500">
                 <IndianRupee size={11} className="text-slate-500" />
-                <input type="number" value={minPrice} onChange={e => { setMinPrice(e.target.value); setPage(1); }} onKeyDown={handlePriceSearch} placeholder="Min" className="bg-transparent w-[45px] text-[12px] font-bold outline-none" />
+                <input type="number" value={minPrice} onChange={e => setMinPrice(e.target.value)} onKeyDown={handlePriceSearch} placeholder="Min" className="bg-transparent w-[45px] text-[12px] font-bold outline-none" />
                 <span className="text-slate-300 text-[10px]">-</span>
-                <input type="number" value={maxPrice} onChange={e => { setMaxPrice(e.target.value); setPage(1); }} onKeyDown={handlePriceSearch} placeholder="Max" className="bg-transparent w-[45px] text-[12px] font-bold outline-none" />
+                <input type="number" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} onKeyDown={handlePriceSearch} placeholder="Max" className="bg-transparent w-[45px] text-[12px] font-bold outline-none" />
+                <button onClick={handleSearchClick} className="bg-black text-white w-6 h-6 rounded-full flex items-center justify-center ml-1 hover:bg-blue-600"><Search size={10}/></button>
               </div>
 
               <button onClick={handleReset} className="ml-auto md:ml-2 flex items-center gap-1 text-[11px] font-black text-slate-600 hover:text-black">
@@ -142,7 +148,7 @@ export default function Home() {
       </div>
 
       <div className="max-w-[1280px] mx-auto px-4 md:px-6 py-5">
-        <p className="text-[11px] font-bold tracking-widest text-slate-400 mb-4">{vehicles.length} CARS • PAGE {page}/{totalPages}</p>
+        <p className="text-[11px] font-bold tracking-widest text-slate-400 mb-4">{vehicles.length} CARS • PAGE {page}/{totalPages} {minPrice || maxPrice? `• ₹${minPrice||0} - ₹${maxPrice||'∞'}` : ''}</p>
 
         {loading? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -150,7 +156,7 @@ export default function Home() {
           </div>
         ) : vehicles.length === 0? (
           <div className="text-center py-10">
-            <p className="font-bold text-slate-600">No cars found. RESET dabao.</p>
+            <p className="font-bold text-slate-600">No cars found in this price range. RESET dabao.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">

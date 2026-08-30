@@ -28,9 +28,9 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-[#0a1931] flex items-center justify-center p-4 md:p-8">
-      <div className="w-full max-w-[1080px] h-auto md:h-[68vh] bg-white rounded-[24px] shadow-[0_20px_80px_rgba(0,0,0,0.4)] overflow-hidden flex flex-col md:flex-row">
+      <div className="w-full max-w-[860px] h-auto md:h-[64vh] bg-white rounded-[24px] shadow-[0_20px_80px_rgba(0,0,0,0.4)] overflow-hidden flex flex-col md:flex-row">
         {/* LEFT IMAGE */}
-        <div className="relative w-full md:w-[52%] h-[280px] md:h-full overflow-hidden">
+        <div className="relative w-full md:w-[48%] h-[260px] md:h-full overflow-hidden">
           <img
             src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=1200"
             alt="Driving"
@@ -38,23 +38,23 @@ const Login = () => {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/10"></div>
           <div className="absolute inset-0 bg-blue-900/20"></div>
-          <div className="relative z-10 p-8 md:p-10 h-full flex flex-col justify-end">
-            <h1 className="text-[38px] md:text-[54px] font-black leading-[0.9] tracking-tighter text-white">
+          <div className="relative z-10 p-8 md:p-8 h-full flex flex-col justify-end">
+            <h1 className="text-[36px] md:text-[46px] font-black leading-[0.9] tracking-tighter text-white">
               Drive Your<br/>Dreams<br/><span className="text-sky-300">Today.</span>
             </h1>
-            <p className="text-white/70 text-[13px] mt-4 max-w-[300px] leading-relaxed">
+            <p className="text-white/70 text-[12px] mt-4 max-w-[260px] leading-relaxed">
               Choose from 100+ premium vehicles. Instant booking, best prices.
             </p>
           </div>
         </div>
 
         {/* RIGHT FORM */}
-        <div className="w-full md:w-[48%] bg-white flex items-center justify-center p-7 md:p-12">
-          <div className="w-full max-w-[320px]">
-            <h2 className="text-[24px] font-bold text-slate-900">Welcome back</h2>
-            <p className="text-[13px] text-slate-500 mt-1">Please enter your details to sign in</p>
+        <div className="w-full md:w-[52%] bg-white flex items-center justify-center p-7 md:p-10">
+          <div className="w-full max-w-[300px]">
+            <h2 className="text-[22px] font-bold text-slate-900">Welcome back</h2>
+            <p className="text-[12px] text-slate-500 mt-1">Please enter your details to sign in</p>
 
-            <form onSubmit={submitHandler} className="mt-8 space-y-4">
+            <form onSubmit={submitHandler} className="mt-7 space-y-4">
               {error && <div className="bg-red-50 border border-red-100 text-red-600 px-3 py-2.5 rounded-xl text-[12px] font-medium">{error}</div>}
               <div>
                 <label className="text-[11px] font-bold tracking-wide text-slate-700">Email</label>

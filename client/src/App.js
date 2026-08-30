@@ -12,6 +12,7 @@ import MyBookings from './pages/MyBookings';
 import BookingDetails from './pages/BookingDetails';
 import BookingSummary from './pages/BookingSummary';
 import BookingConfirmation from './pages/BookingConfirmation';
+import Profile from './pages/Profile'; // 🔥 NEW
 
 import AdminDashboard from './pages/AdminDashboard';
 import ManageVehicles from './pages/admin/ManageVehicles';
@@ -25,7 +26,6 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        {/* FIX: Toast ko sabse upar lao - navbar se bhi upar */}
         <Toaster
           position="top-right"
           containerStyle={{
@@ -67,7 +67,11 @@ function App() {
               <Route path="/vehicle/:id" element={<VehicleDetails />} />
               <Route path="/vehicles/:id" element={<VehicleDetails />} />
 
-              {/* Booking Flow - Correct Order */}
+              {/* Customer Profile - NEW */}
+              <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+              <Route path="/my-profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+
+              {/* Booking Flow */}
               <Route path="/booking-summary" element={<PrivateRoute><BookingSummary /></PrivateRoute>} />
               <Route path="/booking-confirmation/:id" element={<PrivateRoute><BookingConfirmation /></PrivateRoute>} />
               <Route path="/my-bookings" element={<PrivateRoute><MyBookings /></PrivateRoute>} />

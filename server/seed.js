@@ -25,7 +25,7 @@ const seed = async () => {
     const catMap = Object.fromEntries(categories.map(c => [c.name, c._id]));
 
     // FIX: Plain password bhejo, Model khud hash karega - double hash nahi hoga
-    await User.create([
+    const createdUsers = await User.create([
       { name: 'Admin', email: 'admin@rental.com', phone: '9999999999', password: 'Admin@123', role: 'admin' },
       { name: 'Trupti', email: 'user@rental.com', phone: '8888888888', password: 'User@123', role: 'user' }
     ]);
@@ -93,8 +93,66 @@ const seed = async () => {
       }
     ];
 
-    await Vehicle.insertMany(vehicles);
+    const createdVehicles = await Vehicle.insertMany(vehicles);
     console.log('✅ 12 REAL CARS SEEDED - 100% LOCAL IMAGES');
+
+    // ===== ADDED: Sample Bookings for Point 15 - Kuch delete nahi kiya, sirf ye add kiya =====
+    const customer = createdUsers.find(u => u.role === 'user');
+    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+
+    const pickup1 = new Date(); pickup1.setDate(pickup1.getDate() + 3);
+    const return1 = new Date(); return1.setDate(return1.getDate() + 6);
+
+    const pickup2 = new Date(); pickup2.setDate(pickup2.getDate() - 10);
+    const return2 = new Date(); return2.setDate(return2.getDate() - 7);
+
+    const sampleBookings = [
+      {
+        bookingNumber: `VR-${dateStr}-0001`,
+        user: customer._id,
+        vehicle: createdVehicles[0]._id,
+        pickupDate: pickup1,
+        returnDate: return1,
+        rentalDays: 3,
+        pricePerDay: createdVehicles[0].pricePerDay,
+        totalAmount: createdVehicles[0].pricePerDay * 3,
+        pickupLocation: "Wardha",
+        status: "CONFIRMED",
+        paymentStatus: "PENDING"
+      },
+      {
+        bookingNumber: `VR-${dateStr}-0002`,
+        user: customer._id,
+        vehicle: createdVehicles[2]._id,
+        pickupDate: pickup2,
+        returnDate: return2,
+        rentalDays: 3,
+        pricePerDay: createdVehicles[2].pricePerDay,
+        totalAmount: createdVehicles[2].pricePerDay * 3,
+        pickupLocation: "Nagpur",
+        status: "COMPLETED",
+        paymentStatus: "PENDING"
+      },
+      {
+        bookingNumber: `VR-${dateStr}-0003`,
+        user: customer._id,
+        vehicle: createdVehicles[1]._id,
+        pickupDate: pickup1,
+        returnDate: return1,
+        rentalDays: 3,
+        pricePerDay: createdVehicles[1].pricePerDay,
+        totalAmount: createdVehicles[1].pricePerDay * 3,
+        pickupLocation: "Wardha",
+        status: "CANCELLED",
+        paymentStatus: "NOT_APPLICABLE"
+      }
+    ];
+
+    await Booking.insertMany(sampleBookings);
+    console.log('✅ 3 Sample Bookings Created - Upcoming, Completed, Cancelled');
+    console.log('✅ SEED COMPLETE: 1 Admin, 1 Customer, 12 Vehicles, 6 Categories, 3 Bookings');
+    // ===== END OF ADDED PART =====
+
     process.exit(0);
   } catch (e) { console.error(e); process.exit(1); }
 };

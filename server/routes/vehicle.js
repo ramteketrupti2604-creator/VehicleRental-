@@ -1,10 +1,25 @@
-const router = require('express').Router();
-const Vehicle = require('../models/Vehicle');
-const {protect, admin} = require('../middleware/auth');
+import express from 'express';
+import Vehicle from '../models/vehicleModel.js';
+const router = express.Router();
 
 router.get('/', async (req,res) => {
-  const vehicles = await Vehicle.find({status: 'AVAILABLE'}).populate('category');
-  res.json({vehicles, total: vehicles.length, pages: 1});
+  try {
+    const { minPrice, maxPrice } = req.query;
+    let vehicles = await Vehicle.find({}).populate('category','name');
+    
+    if(minPrice || maxPrice){
+      const min = Number(minPrice) || 0;
+      const max = Number(maxPrice) || 9999999;
+      vehicles = vehicles.filter(v => {
+        const p = Number(v.pricePerDay);
+        return p >= min && p <= max;
+      });
+    }
+    
+    res.json({ vehicles, total: vehicles.length, totalPages: 1, currentPage: 1 });
+  } catch(e){
+    res.status(500).json({ message: e.message });
+  }
 });
 
 router.get('/:id', async (req,res) => {
@@ -12,4 +27,4 @@ router.get('/:id', async (req,res) => {
   res.json(vehicle);
 });
 
-module.exports = router; // <-- ye line important hai
+export default router;

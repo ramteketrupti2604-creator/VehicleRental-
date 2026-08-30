@@ -13,6 +13,13 @@ const MyBookings = () => {
   const [filter, setFilter] = useState('All');
   const navigate = useNavigate();
 
+  // Reschedule States - NEW
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [newPickup, setNewPickup] = useState('');
+  const [newReturn, setNewReturn] = useState('');
+  const [rescheduling, setRescheduling] = useState(false);
+
   const downloadReceipt = (booking) => {
     const doc = new jsPDF();
     const bookingNo = booking.bookingNumber || booking._id.slice(-6).toUpperCase();
@@ -77,28 +84,29 @@ const MyBookings = () => {
     toast.success('Receipt Downloaded! 📄');
   };
 
-  useEffect(() => {
-    const fetchBookings = async () => {
+  const fetchBookings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      let res;
       try {
-        const token = localStorage.getItem('token');
-        let res;
-        try {
-          res = await axios.get(`${API_URL}/bookings/mybookings`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-        } catch {
-          res = await axios.get(`${API_URL}/bookings/my`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-        }
-        const data = Array.isArray(res.data)? res.data : res.data.bookings || [];
-        setBookings(data);
+        res = await axios.get(`${API_URL}/bookings/mybookings`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
       } catch {
-        toast.error('Failed to load bookings');
-      } finally {
-        setLoading(false);
+        res = await axios.get(`${API_URL}/bookings/my`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
       }
-    };
+      const data = Array.isArray(res.data)? res.data : res.data.bookings || [];
+      setBookings(data);
+    } catch {
+      toast.error('Failed to load bookings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchBookings();
   }, []);
 
@@ -116,6 +124,48 @@ const MyBookings = () => {
     }
   };
 
+  // RESCHEDULE LOGIC - FIXED
+  const handleRescheduleClick = (booking) => {
+    setSelectedBooking(booking);
+    setNewPickup(new Date(booking.pickupDate).toISOString().split('T')[0]);
+    setNewReturn(new Date(booking.returnDate).toISOString().split('T')[0]);
+    setShowReschedule(true);
+  };
+
+  const handleRescheduleSubmit = async () => {
+    if(!newPickup ||!newReturn){
+      toast.error('Please select both dates');
+      return;
+    }
+    if(new Date(newReturn) <= new Date(newPickup)){
+      toast.error('Return date must be after pickup');
+      return;
+    }
+    setRescheduling(true);
+    try{
+      const token = localStorage.getItem('token');
+      console.log("Rescheduling:", selectedBooking._id, newPickup, newReturn);
+      const res = await axios.put(`${API_URL}/bookings/${selectedBooking._id}/reschedule`, {
+        pickupDate: newPickup,
+        returnDate: newReturn,
+        startDate: newPickup,
+        endDate: newReturn
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('Booking Rescheduled! 📅');
+      setBookings(prev => prev.map(b => b._id === selectedBooking._id? res.data.booking : b));
+      setShowReschedule(false);
+      // Optional: reload to confirm
+      fetchBookings();
+    }catch(err){
+      console.log("Reschedule error full:", err.response?.data);
+      toast.error(err.response?.data?.message || 'Reschedule failed');
+    }finally{
+      setRescheduling(false);
+    }
+  };
+
   if (loading) return <div className="loading-shimmer">Loading bookings...</div>;
 
   // ===== FIXED LOGIC =====
@@ -128,21 +178,21 @@ const MyBookings = () => {
   const isCompletedByDate = (b) => {
     if(isCancelled(b)) return false;
     const returnDate = new Date(b.returnDate || b.endDate);
-    return returnDate < new Date(); // Return date nikal gaya to Completed
+    return returnDate < new Date();
   }
 
   const filtered = bookings.filter(b => {
     if (filter === 'All') return true;
-    if (filter === 'Upcoming') return !isCancelled(b) && !isCompletedByDate(b);
-    if (filter === 'Completed') return !isCancelled(b) && isCompletedByDate(b);
+    if (filter === 'Upcoming') return!isCancelled(b) &&!isCompletedByDate(b);
+    if (filter === 'Completed') return!isCancelled(b) && isCompletedByDate(b);
     if (filter === 'Cancelled') return isCancelled(b);
     return true;
   });
 
   const counts = {
     All: bookings.length,
-    Upcoming: bookings.filter(b => !isCancelled(b) && !isCompletedByDate(b)).length,
-    Completed: bookings.filter(b => !isCancelled(b) && isCompletedByDate(b)).length,
+    Upcoming: bookings.filter(b =>!isCancelled(b) &&!isCompletedByDate(b)).length,
+    Completed: bookings.filter(b =>!isCancelled(b) && isCompletedByDate(b)).length,
     Cancelled: bookings.filter(b => isCancelled(b)).length,
   };
 
@@ -183,8 +233,8 @@ const MyBookings = () => {
           {filtered.map(b => {
             const statusUpper = getStatus(b);
             const completed = isCompletedByDate(b);
-            const displayStatus = isCancelled(b) ? 'CANCELLED' : completed ? 'COMPLETED' : statusUpper || 'CONFIRMED';
-            
+            const displayStatus = isCancelled(b)? 'CANCELLED' : completed? 'COMPLETED' : statusUpper || 'CONFIRMED';
+
             return (
             <div key={b._id} className="b-card">
               <div className="b-left">
@@ -216,8 +266,11 @@ const MyBookings = () => {
               <div className="b-right">
                 <button onClick={()=>downloadReceipt(b)} className="btn-pdf">📄 PDF Receipt</button>
                 <Link to={`/booking/${b._id}`} className="btn-view">View Details</Link>
-                {!isCancelled(b) && !completed ? (
-                  <button onClick={()=>handleCancel(b._id)} className="btn-cancel">Cancel Booking</button>
+                {!isCancelled(b) &&!completed? (
+                  <>
+                    <button onClick={()=>handleRescheduleClick(b)} className="btn-reschedule" style={{background:'#2563eb', color:'#fff', padding:'8px 14px', borderRadius:'999px', fontWeight:'800', fontSize:'12px', border:'none', cursor:'pointer'}}>📅 Reschedule</button>
+                    <button onClick={()=>handleCancel(b._id)} className="btn-cancel">Cancel Booking</button>
+                  </>
                 ) : (
                   <div className="btn-disabled">{displayStatus}</div>
                 )}
@@ -225,6 +278,34 @@ const MyBookings = () => {
             </div>
             )
           })}
+        </div>
+      )}
+
+      {/* RESCHEDULE MODAL - NEW */}
+      {showReschedule && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:9999, padding:'16px'}}>
+          <div style={{background:'#fff', borderRadius:'16px', padding:'20px', width:'100%', maxWidth:'380px', boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+            <h3 style={{fontWeight:900, fontSize:'16px', marginBottom:'4px'}}>Reschedule Booking</h3>
+            <p style={{fontSize:'12px', color:'#64748b', marginBottom:'14px'}}>{selectedBooking?.vehicle?.brand} {selectedBooking?.vehicle?.name} - {selectedBooking?.bookingNumber}</p>
+
+            <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+              <div>
+                <label style={{fontSize:'10px', fontWeight:800, color:'#475569'}}>NEW PICKUP DATE *</label>
+                <input type="date" value={newPickup} onChange={e=>setNewPickup(e.target.value)} style={{width:'100%', marginTop:'4px', padding:'9px 10px', border:'1.5px solid #e2e8f0', borderRadius:'10px', fontSize:'13px', fontWeight:600}} />
+              </div>
+              <div>
+                <label style={{fontSize:'10px', fontWeight:800, color:'#475569'}}>NEW RETURN DATE *</label>
+                <input type="date" value={newReturn} onChange={e=>setNewReturn(e.target.value)} style={{width:'100%', marginTop:'4px', padding:'9px 10px', border:'1.5px solid #e2e8f0', borderRadius:'10px', fontSize:'13px', fontWeight:600}} />
+              </div>
+            </div>
+
+            <div style={{display:'flex', gap:'8px', marginTop:'16px', justifyContent:'flex-end'}}>
+              <button onClick={()=>setShowReschedule(false)} style={{padding:'8px 18px', borderRadius:'999px', border:'1.5px solid #e2e8f0', background:'#fff', fontWeight:700, fontSize:'12px', cursor:'pointer'}}>Cancel</button>
+              <button onClick={handleRescheduleSubmit} disabled={rescheduling} style={{padding:'8px 18px', borderRadius:'999px', border:'none', background:'#2563eb', color:'#fff', fontWeight:800, fontSize:'12px', cursor:'pointer'}}>
+                {rescheduling? 'Rescheduling...' : 'Confirm Reschedule'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

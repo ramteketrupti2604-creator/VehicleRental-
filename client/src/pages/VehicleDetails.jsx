@@ -7,6 +7,8 @@ import { differenceInDays } from 'date-fns';
 import { Car, Fuel, Users, MapPin, Calendar, CheckCircle, Shield, ArrowRight, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 const VehicleDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -17,38 +19,39 @@ const VehicleDetails = () => {
   const [bookedDates, setBookedDates] = useState([]);
   const [rating, setRating] = useState(5);
   const [reviews, setReviews] = useState([
-    { name: 'Rahul Sharma', rating: 5, comment: 'Superb car, very clean and mileage awesome! Best for long drives.' },
-    { name: 'Priya Singh', rating: 4, comment: 'Good experience, driver was polite and car was sanitized.' }
+    { name: 'Rahul Sharma', rating: 5, comment: 'Superb car, very clean and mileage awesome!' },
+    { name: 'Priya Singh', rating: 4, comment: 'Good experience, driver was polite.' }
   ]);
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/vehicles/${id}`)
-    .then(res => setVehicle(res.data.vehicle || res.data))
-    .catch(() => toast.error('Vehicle not found'))
-    .finally(() => setLoading(false));
+    const fetchVehicleAndBookings = async () => {
+      try {
+        const resVehicle = await axios.get(`${API_URL}/api/vehicles/${id}`);
+        setVehicle(resVehicle.data.vehicle || resVehicle.data);
+      } catch { toast.error('Vehicle not found'); } finally { setLoading(false); }
 
-    axios.get(`http://localhost:5000/api/bookings/vehicle/${id}/booked-dates`)
-    .then(res => {
-        console.log("Booked API Response:", res.data);
+      try {
+        // Per vehicle API - Sirf isi gaadi ki dates
+        const res = await axios.get(`${API_URL}/api/bookings/vehicle/${id}/booked-dates`);
         const dates = (res.data.bookedDates || []).map(d => {
           const date = new Date(d);
-          date.setHours(0, 0, 0, 0);
+          date.setHours(0,0,0,0);
           return date;
         });
         setBookedDates(dates);
-      })
-    .catch(() => {
-        console.log('No bookings yet - DB empty');
+        console.log(`Car ${id} booked dates:`, dates);
+      } catch (err) {
+        console.log('No bookings for this car');
         setBookedDates([]);
-      });
+      }
+    };
+    fetchVehicleAndBookings();
   }, [id]);
 
   const isBookedDay = (date) => {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
+    const d = new Date(date); d.setHours(0,0,0,0);
     return bookedDates.some(b => {
-      const bd = new Date(b);
-      bd.setHours(0, 0, 0, 0);
+      const bd = new Date(b); bd.setHours(0,0,0,0);
       return bd.getTime() === d.getTime();
     });
   };
@@ -56,53 +59,47 @@ const VehicleDetails = () => {
   const days = pickupDate && returnDate? Math.max(differenceInDays(returnDate, pickupDate) + 1, 1) : 0;
   const total = days > 0? days * (vehicle?.pricePerDay || 0) : 0;
 
-  // ===== YAHI FIX HAI - AB BACKEND PE DEPEND NAHI =====
   const handleCheckAvailability = async () => {
     if (!pickupDate ||!returnDate) return toast.error('Please select both dates');
     if (pickupDate >= returnDate) return toast.error('Return date must be after pickup date');
-
-    // Force Available because DB is clean
+    if (isBookedDay(pickupDate) || isBookedDay(returnDate)) {
+      return toast.error('Selected date is already booked for this car');
+    }
     toast.success("Vehicle Available ✅");
     navigate('/booking-summary', { state: { vehicle, pickupDate, returnDate, total, days } });
-  }
+  };
 
-  if (loading) return <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-800 flex items-center justify-center"><div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div></div>;
+  if (loading) return <div className="min-h-screen bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center"><div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div></div>;
   if (!vehicle) return <div className="p-8 text-center">Vehicle not found</div>;
 
   return (
     <div className="min-h-screen relative pb-[90px] lg:pb-0">
       <style>{`
-      .booked-day {
-          background-color: #ef4444!important;
-          color: white!important;
-          text-decoration: line-through!important;
-          border-radius: 50%!important;
-        }
-      .react-datepicker__day--disabled {
-          background-color: #fecaca!important;
-          color: #dc2626!important;
-          text-decoration: line-through;
-        }
-      .react-datepicker__day--disabled {
-          pointer-events: none;
-        }
-      .booked-legend {
-          display: flex;
-          gap: 12px;
-          margin-top: 10px;
-          font-size: 11px;
-          font-weight: 700;
-        }
+     /* Sirf booked date red hogi */
+    .booked-day {
+        background-color: #ef4444!important;
+        color: white!important;
+        text-decoration: line-through!important;
+        border-radius: 50%!important;
+     }
+     /* Past dates grey hongi, red nahi */
+    .react-datepicker__day--disabled {
+        background-color: #f1f5f9!important;
+        color: #94a3b8!important;
+        text-decoration: none!important;
+     }
+     /* Agar koi date booked bhi hai aur disabled bhi, to red hi rahegi */
+    .react-datepicker__day--disabled.booked-day {
+        background-color: #ef4444!important;
+        color: white!important;
+     }
       `}</style>
-
       <div className="fixed inset-0 -z-10 bg-gradient-to-br from-[#eff6ff] via-[#dbeafe] to-[#bfdbfe]"></div>
-      <div className="fixed top-0 left-0 w-[500px] h-[500px] -z-10 bg-blue-400/20 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2"></div>
-      <div className="fixed bottom-0 right-0 w-[600px] h-[600px] -z-10 bg-indigo-400/20 rounded-full blur-[120px] translate-x-1/3 translate-y-1/3"></div>
 
       <div className="max-w-[1320px] mx-auto px-3 md:px-8 py-4 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-7 items-start">
           <div className="lg:col-span-8 space-y-5">
-            <div className="bg-white rounded-[24px] md:rounded-[32px] overflow-hidden shadow-[0_20px_60px_-20px_rgba(37,99,235,0.25)] border border-white/60">
+            <div className="bg-white rounded-[24px] md:rounded-[32px] overflow-hidden shadow border">
               <div className="relative h-[320px] sm:h-[420px] md:h-[520px] bg-slate-100">
                 <img src={vehicle.images?.[0]} alt={vehicle.name} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
@@ -111,15 +108,15 @@ const VehicleDetails = () => {
                   <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-full text-[10px] font-black tracking-widest shadow-lg">{vehicle.category?.name || vehicle.category}</span>
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-                  <h1 className="text-white text-[28px] md:text-[42px] font-black leading-[0.9] drop-shadow-xl">{vehicle.brand} {vehicle.name}</h1>
+                  <h1 className="text-white text-[28px] md:text-[42px] font-black">{vehicle.brand} {vehicle.name}</h1>
                   <p className="text-white/90 text-[12px] md:text-[14px] mt-3 flex items-center gap-2 font-semibold bg-black/20 backdrop-blur-md w-fit px-3 py-1 rounded-full"><MapPin size={14} /> {vehicle.location} • {vehicle.model} • {vehicle.year}</p>
                 </div>
               </div>
               <div className="p-5 md:p-8">
                 <div className="grid grid-cols-3 gap-3 md:gap-4">
-                  <div className="bg-gradient-to-br from-[#f0f6ff] to-[#e0eaff] border border-blue-100 rounded-[18px] p-4 text-center"><Users size={22} className="mx-auto mb-2 text-blue-600" /><p className="font-black text-[14px] text-slate-900">{vehicle.seats} Seats</p><p className="text-[10px] text-slate-500 font-bold tracking-widest">CAPACITY</p></div>
-                  <div className="bg-gradient-to-br from-[#f0f6ff] to-[#e0eaff] border border-blue-100 rounded-[18px] p-4 text-center"><Fuel size={22} className="mx-auto mb-2 text-blue-600" /><p className="font-black text-[14px] text-slate-900">{vehicle.fuelType}</p><p className="text-[10px] text-slate-500 font-bold tracking-widest">FUEL</p></div>
-                  <div className="bg-gradient-to-br from-[#f0f6ff] to-[#e0eaff] border border-blue-100 rounded-[18px] p-4 text-center"><Car size={22} className="mx-auto mb-2 text-blue-600" /><p className="font-black text-[14px] text-slate-900">{vehicle.transmission}</p><p className="text-[10px] text-slate-500 font-bold tracking-widest">GEAR</p></div>
+                  <div className="bg-gradient-to-br from-[#f0f6ff] to-[#e0eaff] border border-blue-100 rounded-[18px] p-4 text-center"><Users size={22} className="mx-auto mb-2 text-blue-600" /><p className="font-black text-[14px]">{vehicle.seats} Seats</p><p className="text-[10px] text-slate-500">CAPACITY</p></div>
+                  <div className="bg-gradient-to-br from-[#f0f6ff] to-[#e0eaff] border border-blue-100 rounded-[18px] p-4 text-center"><Fuel size={22} className="mx-auto mb-2 text-blue-600" /><p className="font-black text-[14px]">{vehicle.fuelType}</p><p className="text-[10px] text-slate-500">FUEL</p></div>
+                  <div className="bg-gradient-to-br from-[#f0f6ff] to-[#e0eaff] border border-blue-100 rounded-[18px] p-4 text-center"><Car size={22} className="mx-auto mb-2 text-blue-600" /><p className="font-black text-[14px]">{vehicle.transmission}</p><p className="text-[10px] text-slate-500">GEAR</p></div>
                 </div>
                 <div className="mt-8">
                   <h3 className="font-black text-[11px] tracking-[2px] text-slate-400">FEATURES</h3>
@@ -149,44 +146,18 @@ const VehicleDetails = () => {
               <div className="mt-7 space-y-4">
                 <div>
                   <label className="font-black text-[10px] tracking-[1.5px] text-slate-500 flex items-center gap-1.5 mb-2"><Calendar size={12} /> PICKUP DATE & TIME</label>
-                  <DatePicker
-                    selected={pickupDate}
-                    onChange={setPickupDate}
-                    minDate={new Date()}
-                    excludeDates={bookedDates}
-                    filterDate={date =>!isBookedDay(date)}
-                    dayClassName={date => isBookedDay(date)? 'booked-day' : undefined}
-                    showTimeSelect
-                    timeIntervals={30}
-                    dateFormat="MMM d, yyyy h:mm aa"
-                    className="border-2 border-slate-100 bg-[#f8fafc] p-3.5 rounded-xl w-full text-[13px] font-bold focus:border-blue-500 outline-none"
-                    placeholderText="Select pickup"
-                    wrapperClassName="w-full"
-                  />
+                  <DatePicker selected={pickupDate} onChange={setPickupDate} minDate={new Date()} excludeDates={bookedDates} dayClassName={date => isBookedDay(date)? 'booked-day' : undefined} showTimeSelect timeIntervals={30} dateFormat="MMM d, yyyy h:mm aa" className="border-2 border-slate-100 bg-[#f8fafc] p-3.5 rounded-xl w-full text-[13px] font-bold focus:border-blue-500 outline-none" placeholderText="Select pickup" wrapperClassName="w-full" />
                 </div>
                 <div>
                   <label className="font-black text-[10px] tracking-[1.5px] text-slate-500 flex items-center gap-1.5 mb-2"><Calendar size={12} /> RETURN DATE & TIME</label>
-                  <DatePicker
-                    selected={returnDate}
-                    onChange={setReturnDate}
-                    minDate={pickupDate || new Date()}
-                    excludeDates={bookedDates}
-                    filterDate={date =>!isBookedDay(date)}
-                    dayClassName={date => isBookedDay(date)? 'booked-day' : undefined}
-                    showTimeSelect
-                    timeIntervals={30}
-                    dateFormat="MMM d, yyyy h:mm aa"
-                    className="border-2 border-slate-100 bg-[#f8fafc] p-3.5 rounded-xl w-full text-[13px] font-bold focus:border-blue-500 outline-none"
-                    placeholderText="Select return"
-                    wrapperClassName="w-full"
-                  />
+                  <DatePicker selected={returnDate} onChange={setReturnDate} minDate={pickupDate || new Date()} excludeDates={bookedDates} dayClassName={date => isBookedDay(date)? 'booked-day' : undefined} showTimeSelect timeIntervals={30} dateFormat="MMM d, yyyy h:mm aa" className="border-2 border-slate-100 bg-[#f8fafc] p-3.5 rounded-xl w-full text-[13px] font-bold focus:border-blue-500 outline-none" placeholderText="Select return" wrapperClassName="w-full" />
                 </div>
 
-                <div className="booked-legend">
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-500 rounded-full inline-block"></span> Booked</span>
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-500 rounded-full inline-block"></span> Available</span>
+                <div className="flex gap-2 text-[11px] font-bold mt-2">
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-500 rounded-full inline-block"></span> Booked only for this {vehicle.name}</span>
                   <span className="text-slate-500">({bookedDates.length} days booked)</span>
                 </div>
+                <p className="text-[10px] text-slate-400">Note: Red dates are booked only for this car. Other cars have different calendar.</p>
               </div>
 
               {days > 0 && <div className="mt-6 bg-slate-900 text-white rounded-2xl p-4"><div className="flex justify-between text-[12px] opacity-60"><span>{days} Days × ₹{vehicle.pricePerDay}</span><span>₹{total}</span></div><div className="flex justify-between text-[20px] font-black mt-2"><span>Total</span><span>₹{total.toLocaleString()}</span></div></div>}

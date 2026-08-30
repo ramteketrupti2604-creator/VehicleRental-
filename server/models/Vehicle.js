@@ -15,10 +15,10 @@ const vehicleSchema = new mongoose.Schema({
   description: { type: String },
   features: [{ type: String }],
   images: [{ type: String }],
-  status: { 
-    type: String, 
-    enum: ["AVAILABLE", "BOOKED", "MAINTENANCE"], 
-    default: "AVAILABLE" 
+  status: {
+    type: String,
+    enum: ["AVAILABLE", "BOOKED", "UNAVAILABLE", "MAINTENANCE"],
+    default: "AVAILABLE"
   }
 }, { timestamps: true });
 

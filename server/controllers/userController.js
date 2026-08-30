@@ -41,6 +41,7 @@ export const registerUser = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         role: user.role,
         token: generateToken(user._id),
       });
@@ -56,9 +57,19 @@ export const registerUser = async (req, res) => {
 // @route GET /api/users/profile
 export const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('-password');
     if (user) {
-      res.json({ _id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role });
+      // bookings count for profile card
+      const totalBookings = await Booking.countDocuments({ user: user._id });
+      res.json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        createdAt: user.createdAt,
+        bookings: totalBookings,
+      });
     } else {
       res.status(404).json({ message: 'User not found' });
     }
@@ -67,28 +78,61 @@ export const getUserProfile = async (req, res) => {
   }
 };
 
-// 🔥 YEHI MISSING THA - Admin Customers - Point 14
-// @desc Get all customers with stats
+// @desc Update user profile
+// @route PUT /api/users/profile
+export const updateUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (user) {
+      user.name = req.body.name || user.name;
+      user.phone = req.body.phone || user.phone;
+      // email update block - security
+
+      const updatedUser = await user.save();
+      const totalBookings = await Booking.countDocuments({ user: updatedUser._id });
+
+      res.json({
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        role: updatedUser.role,
+        createdAt: updatedUser.createdAt,
+        bookings: totalBookings,
+      });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc Get all customers with stats - Admin
 // @route GET /api/users
 export const getAllCustomers = async (req, res) => {
   try {
-    const users = await User.find({ role: { $ne: 'admin' } }).select("-password").sort({ createdAt: -1 });
+    const users = await User.find({ role: { $ne: 'admin' } })
+      .select('-password')
+      .sort({ createdAt: -1 });
 
-    const customersWithStats = await Promise.all(users.map(async (u) => {
-      const bookings = await Booking.find({ user: u._id });
-      const totalBookings = bookings.length;
-      const totalSpent = bookings.reduce((sum, b) => sum + Number(b.totalAmount || 0), 0);
-      return {
-        _id: u._id,
-        name: u.name,
-        email: u.email,
-        phone: u.phone || '-',
-        role: u.role,
-        createdAt: u.createdAt,
-        totalBookings,
-        totalSpent,
-      };
-    }));
+    const customersWithStats = await Promise.all(
+      users.map(async (u) => {
+        const bookings = await Booking.find({ user: u._id });
+        const totalBookings = bookings.length;
+        const totalSpent = bookings.reduce((sum, b) => sum + Number(b.totalAmount || 0), 0);
+        return {
+          _id: u._id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone || '-',
+          role: u.role,
+          createdAt: u.createdAt,
+          totalBookings,
+          totalSpent,
+        };
+      })
+    );
 
     res.json(customersWithStats);
   } catch (error) {

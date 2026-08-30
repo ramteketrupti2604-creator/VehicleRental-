@@ -23,7 +23,8 @@ const AddVehicle = () => {
     status: 'AVAILABLE'
   });
   const [categories, setCategories] = useState([]);
-  const [image, setImage] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
   const [loading, setLoading] = useState(false);
   const { token } = useAuth();
   const navigate = useNavigate();
@@ -43,23 +44,46 @@ const AddVehicle = () => {
 
   const handleChange = e => setFormData({...formData, [e.target.name]: e.target.value });
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmit = async e => {
     e.preventDefault();
     setLoading(true);
     try {
       const featuresArray = formData.features? formData.features.split(',').map(f => f.trim()) : [];
       const finalName = formData.name || `${formData.brand} ${formData.model}`.trim();
-      const payload = {
-      ...formData,
-        name: finalName,
-        features: featuresArray,
-        images: image? [image] : [],
-        year: Number(formData.year),
-        pricePerDay: Number(formData.pricePerDay),
-        seats: Number(formData.seats)
-      };
-      await axios.post('http://localhost:5000/api/vehicles', payload, {
-        headers: { Authorization: `Bearer ${token}` }
+
+      const payloadData = new FormData();
+      payloadData.append('name', finalName);
+      payloadData.append('brand', formData.brand);
+      payloadData.append('model', formData.model);
+      payloadData.append('year', formData.year);
+      payloadData.append('category', formData.category);
+      payloadData.append('pricePerDay', formData.pricePerDay);
+      payloadData.append('location', formData.location);
+      payloadData.append('description', formData.description);
+      payloadData.append('registrationNumber', formData.registrationNumber);
+      payloadData.append('fuelType', formData.fuelType);
+      payloadData.append('transmission', formData.transmission);
+      payloadData.append('seats', formData.seats);
+      payloadData.append('status', formData.status);
+      payloadData.append('features', JSON.stringify(featuresArray));
+
+      if (imageFile) {
+        payloadData.append('image', imageFile);
+      }
+
+      await axios.post('http://localhost:5000/api/vehicles', payloadData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       });
       toast.success('Vehicle Added Successfully!');
       navigate('/admin');
@@ -155,8 +179,13 @@ const AddVehicle = () => {
           </div>
 
           <div className="input-group full-width">
-            <label>Image URL</label>
-            <input placeholder="https://images.unsplash.com/..." value={image} onChange={e => setImage(e.target.value)}/>
+            <label>Upload Vehicle Image *</label>
+            <input type="file" accept="image/*" onChange={handleImageChange} required />
+            {imagePreview && (
+              <div style={{marginTop:'10px'}}>
+                <img src={imagePreview} alt="preview" style={{width:'150px', height:'100px', objectFit:'cover', borderRadius:'8px', border:'1px solid #ddd'}} />
+              </div>
+            )}
           </div>
 
           <div className="input-group full-width">
