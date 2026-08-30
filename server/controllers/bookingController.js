@@ -164,11 +164,9 @@ const cancelBooking = asyncHandler(async (req, res) => {
     throw new Error(`Booking is already ${booking.status}`);
   }
 
-  // FINAL FIX - Admin bypass hataya + Log add kiya
   const now = new Date();
   const pickup = new Date(booking.pickupDate);
   const hoursLeft = (pickup - now) / (1000 * 60 * 60);
-  console.log(`Cancel Check -> HoursLeft: ${hoursLeft.toFixed(2)}`);
 
   if (hoursLeft < 24) {
     res.status(400);
@@ -189,4 +187,24 @@ const cancelBooking = asyncHandler(async (req, res) => {
   res.json({ message: "Booking cancelled successfully", booking });
 });
 
-export { createBooking, getMyBookings, getAllBookings, getBookingById, cancelBooking };
+// COMPLETE BOOKING - FINAL FIX FOR PAID ERROR
+const completeBooking = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) {
+    res.status(404);
+    throw new Error("Booking not found");
+  }
+
+  if (booking.status === 'COMPLETED') {
+    res.status(400);
+    throw new Error("Already completed");
+  }
+
+  booking.status = 'COMPLETED';
+  booking.paymentStatus = 'PAID';
+  await booking.save({ validateBeforeSave: false });
+
+  res.json({ message: "Booking completed successfully", booking });
+});
+
+export { createBooking, getMyBookings, getAllBookings, getBookingById, cancelBooking, completeBooking };

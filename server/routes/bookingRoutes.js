@@ -149,7 +149,7 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// ===== MY BOOKINGS - 2 routes for safety =====
+// ===== MY BOOKINGS =====
 const myBookingsHandler = async (req,res)=>{
   try{
     const bookings = await Booking.find({ user: req.user.id }).populate('vehicle').sort({createdAt: -1});
@@ -158,6 +158,27 @@ const myBookingsHandler = async (req,res)=>{
 };
 router.get('/my', auth, myBookingsHandler);
 router.get('/mybookings', auth, myBookingsHandler);
+
+// ===== COMPLETE BOOKING - FINAL FIX =====
+router.put('/:id/complete', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    booking.status = 'COMPLETED';
+    booking.paymentStatus = 'PAID';
+    await booking.save({ validateBeforeSave: false });
+
+    const updated = await Booking.findById(booking._id).populate('vehicle').populate('user','name email');
+    res.json({ message: "Booking completed successfully", booking: updated });
+  } catch (e) {
+    console.log("Complete Error:", e.message);
+    res.status(500).json({ message: e.message });
+  }
+});
 
 // ===== CANCEL BOOKING =====
 router.put('/:id/cancel', auth, async (req, res) => {
@@ -174,7 +195,7 @@ router.put('/:id/cancel', auth, async (req, res) => {
     }
 
     booking.status = 'CANCELLED';
-    await booking.save();
+    await booking.save({ validateBeforeSave: false });
 
     if (booking.couponCode) {
       const c = await Coupon.findOne({ code: booking.couponCode });
@@ -189,7 +210,7 @@ router.put('/:id/cancel', auth, async (req, res) => {
   }
 });
 
-// ===== RESCHEDULE BOOKING - FINAL WORKING (NO AVAILABILITY BLOCK) =====
+// ===== RESCHEDULE BOOKING =====
 router.put('/:id/reschedule', auth, async (req, res) => {
   try {
     const { pickupDate, returnDate, startDate, endDate } = req.body;
@@ -218,7 +239,6 @@ router.put('/:id/reschedule', auth, async (req, res) => {
       return res.status(400).json({ message: "Return date must be after pickup date" });
     }
 
-    // Availability check hata diya hai taaki thak na jao - direct reschedule hoga
     const days = Math.ceil((newReturn - newPickup) / (1000*60*60*24)) || 1;
     
     booking.previousPickupDate = booking.pickupDate;
