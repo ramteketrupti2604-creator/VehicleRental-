@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import User from '../models/userModel.js';
 
 const generateToken = (id) => {
@@ -8,14 +9,11 @@ const generateToken = (id) => {
 export const registerUser = async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
-
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
-
     const user = await User.create({ name, email, phone, password });
-
     if (user) {
       res.status(201).json({
         _id: user._id,
@@ -38,7 +36,7 @@ export const loginUser = async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
 
-    if (user && user.password === password) { // abhi direct compare
+    if (user && (await bcrypt.compare(password, user.password))) {
       res.json({
         _id: user._id,
         name: user.name,
