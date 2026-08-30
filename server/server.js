@@ -14,6 +14,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
+import seedRoute from './routes/seedRoute.js'; // <-- YEH LINE 1 ADDED
 import Coupon from './models/couponModel.js';
 
 import { protect, admin } from './middleware/authMiddleware.js';
@@ -105,6 +106,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/coupons', couponRoutes);
+app.use('/api/seed', seedRoute); // <-- YEH LINE 2 ADDED
 
 app.get('/api/bookings/vehicle/:id/booked-dates', async (req, res) => {
   try {
