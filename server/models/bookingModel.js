@@ -24,14 +24,12 @@ const bookingSchema = new mongoose.Schema({
   },
   paymentStatus: {
     type: String,
-    enum: ['PENDING', 'PAID', 'NOT_APPLICABLE', 'FAILED'],
     default: 'PENDING'
   },
   isRescheduled: { type: Boolean, default: false },
   rescheduledAt: { type: Date },
   previousPickupDate: { type: Date },
-  previousReturnDate: { type: Date },
-  discountAmount: { type: Number, default: 0 }
+  previousReturnDate: { type: Date }
 }, { timestamps: true });
 
 export default mongoose.model('Booking', bookingSchema);

@@ -1,140 +1,176 @@
 import express from 'express';
 import Booking from '../models/Booking.js';
 import Vehicle from '../models/Vehicle.js';
-import User from '../models/User.js';
+import Coupon from '../models/Coupon.js';
 import auth from '../middleware/auth.js';
 import { sendBookingEmail } from '../utils/sendEmail.js';
 
 const router = express.Router();
 
 router.get('/all-debug', async (req, res) => {
-  try { const bookings = await Booking.find({}).limit(30); res.json(bookings); }
-  catch(e) { res.json({ error: e.message }); }
-});
-
-router.get('/clean-this-car/:vehicleId', async (req, res) => {
   try {
-    const result = await Booking.deleteMany({ vehicle: req.params.vehicleId });
-    const result2 = await Booking.deleteMany({});
-    res.json({ message: `Clean ho gaya! ${result.deletedCount} + ${result2.deletedCount} bookings deleted. DB empty now` });
-  } catch(e) { res.status(500).json({ message: e.message }); }
+    const bookings = await Booking.find({}).sort({createdAt: -1}).limit(30).populate('vehicle');
+    res.json(bookings);
+  } catch(e) { res.json({ error: e.message }); }
 });
 
-router.post('/check-availability', async (req, res) => {
+router.post('/check-availability', auth, async (req, res) => {
   try {
     const { vehicleId, pickupDate, returnDate, startDate, endDate } = req.body;
     const sDate = pickupDate || startDate;
     const eDate = returnDate || endDate;
-
-    const vehicle = await Vehicle.findById(vehicleId);
-    if(!vehicle) return res.json({ available: false, message: "Vehicle not found" });
-
+    if (!vehicleId || !sDate || !eDate) return res.status(400).json({ message: "Dates required" });
     const pickup = new Date(sDate);
     const returnD = new Date(eDate);
-
+    const vehicle = await Vehicle.findById(vehicleId);
+    if(!vehicle) return res.status(400).json({ available: false, message: "Vehicle not found" });
     const overlapping = await Booking.findOne({
       vehicle: vehicleId,
       status: { $in: ['PENDING','CONFIRMED'] },
-      pickupDate: { $lt: returnD },
-      returnDate: { $gt: pickup }
+      $or: [
+        { startDate: { $lt: returnD }, endDate: { $gt: pickup } },
+        { pickupDate: { $lt: returnD }, returnDate: { $gt: pickup } }
+      ]
     });
-
-    if (overlapping) {
-      return res.json({
-        available: false,
-        message: `Already booked from ${overlapping.pickupDate.toDateString()} to ${overlapping.returnDate.toDateString()}`
-      });
-    }
-
-    const days = Math.ceil((returnD - pickup) / (1000*60*60*24)) + 1;
-    const finalDays = days > 0? days : 1;
-
-    return res.json({
-      available: true,
-      message: "Available",
-      rentalDays: finalDays,
-      pricePerDay: vehicle.pricePerDay,
-      totalAmount: finalDays * vehicle.pricePerDay
-    });
-  } catch(err) {
-    console.log(err);
-    return res.json({ available: true, message: "Available (fallback)" });
-  }
+    if (overlapping) return res.json({ available: false, message: `Not Available ${pickup.toDateString()} to ${returnD.toDateString()}` });
+    const days = Math.ceil((returnD - pickup) / (1000*60*60*24)) || 1;
+    res.json({ available: true, rentalDays: days, pricePerDay: vehicle.pricePerDay, totalAmount: days * vehicle.pricePerDay });
+  } catch(err) { res.status(500).json({ message: err.message }); }
 });
 
-router.get('/check-availability', async (req, res) => {
-  return res.json({ available: true, message: "Available" });
-});
-
-// ===== YAHI MAIN FIX HAI - PER VEHICLE CALENDAR =====
 const bookedDatesHandler = async (req, res) => {
   try {
     const vehicleId = req.params.vehicleId || req.params.id;
-    const bookings = await Booking.find({
-      vehicle: vehicleId,
-      status: { $in: ['CONFIRMED', 'PENDING'] }
-    }).select('pickupDate returnDate');
-
-    let allDates = [];
+    const bookings = await Booking.find({ vehicle: vehicleId, status: { $nin: ['cancelled', 'CANCELLED'] } });
+    let arr = [];
     bookings.forEach(b => {
-      let curr = new Date(b.pickupDate);
-      let end = new Date(b.returnDate);
-      while(curr <= end) {
-        allDates.push(new Date(curr));
-        curr.setDate(curr.getDate() + 1);
-      }
+      const sRaw = b.startDate || b.pickupDate;
+      const eRaw = b.endDate || b.returnDate;
+      if(!sRaw || !eRaw) return;
+      let cur = new Date(sRaw); cur.setHours(0,0,0,0);
+      let end = new Date(eRaw); end.setHours(0,0,0,0);
+      while(cur <= end){ arr.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
     });
-
-    // Sirf isi gaadi ki dates
-    res.json({ bookedDates: allDates, count: allDates.length });
-  } catch (err) {
-    console.log(err);
-    res.json({ bookedDates: [], count: 0 });
-  }
+    res.json({ bookedDates: arr });
+  } catch(e){ res.status(500).json({ message: e.message }); }
 };
 router.get('/vehicle/:vehicleId/booked-dates', bookedDatesHandler);
 router.get('/:vehicleId/booked-dates', bookedDatesHandler);
-router.get('/:id/booked-dates', bookedDatesHandler);
 
 router.post('/', auth, async (req, res) => {
   try {
-    const { vehicleId, startDate, endDate, pickupDate, returnDate } = req.body;
+    const { vehicleId, vehicle, startDate, endDate, pickupDate, returnDate, pickupLocation, couponCode } = req.body;
+    const vId = vehicleId || vehicle;
     const sDate = startDate || pickupDate;
     const eDate = endDate || returnDate;
-    const vehicle = await Vehicle.findById(vehicleId);
-    if(!vehicle) return res.status(400).json({ message: 'Vehicle not available' });
-    const days = Math.ceil((new Date(eDate) - new Date(sDate)) / (1000*60*60*24)) + 1;
-    const totalPrice = days * vehicle.pricePerDay;
+    if(!vId || !sDate || !eDate) return res.status(400).json({ message: "vehicle, pickupDate, returnDate required" });
+    const vehicleDoc = await Vehicle.findById(vId);
+    if(!vehicleDoc) return res.status(404).json({ message: 'Vehicle not found' });
+    const pickup = new Date(sDate);
+    const returnD = new Date(eDate);
+    const days = Math.ceil((returnD - pickup) / (1000*60*60*24)) || 1;
+    let discount = 0; let coupon = null;
+    if(couponCode){
+      coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
+      if(coupon && new Date(coupon.expiryDate) > new Date()){
+        if(coupon.discountType === 'FLAT') discount = coupon.discountValue;
+        else if(coupon.discountType === 'PERCENT') discount = (days * vehicleDoc.pricePerDay * coupon.discountValue)/100;
+        if(coupon.maxDiscount) discount = Math.min(discount, coupon.maxDiscount);
+      }
+    }
+    const totalAmount = (days * vehicleDoc.pricePerDay) - discount;
+    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    const count = await Booking.countDocuments({ createdAt: { $gte: new Date(new Date().setHours(0,0,0,0)) } });
+    const bookingNumber = `VR-${dateStr}-${String(count+1).padStart(4,'0')}`;
     const booking = new Booking({
-      user: req.user.id, vehicle: vehicleId,
-      startDate: sDate, endDate: eDate,
-      pickupDate: sDate, returnDate: eDate,
-      totalPrice, totalAmount: totalPrice, status: 'confirmed'
+      bookingNumber, user: req.user.id, vehicle: vId,
+      startDate: sDate, endDate: eDate, pickupDate: sDate, returnDate: eDate,
+      rentalDays: days, pricePerDay: vehicleDoc.pricePerDay,
+      totalAmount: totalAmount > 0 ? totalAmount : 0,
+      originalAmount: days * vehicleDoc.pricePerDay,
+      discount, couponCode: coupon?.code || null,
+      pickupLocation: pickupLocation || 'Nagpur',
+      status: 'CONFIRMED', paymentStatus: 'PENDING'
     });
     await booking.save();
-    try {
-      const user = await User.findById(req.user.id);
-      await sendBookingEmail({
-        to: user.email, bookingNumber: booking._id,
-        vehicleName: vehicle.name || `${vehicle.brand} ${vehicle.model}`,
-        pickupDate: sDate, returnDate: eDate, totalAmount: totalPrice
-      });
-    } catch (emailErr) { console.log("Email fail:", emailErr.message); }
-    res.status(201).json({ message: "Booking successful", booking });
-  } catch (err) {
-    console.log(err); res.status(500).json({ message: err.message });
+    const pop = await Booking.findById(booking._id).populate('vehicle').populate('user','name email');
+    try{ await sendBookingEmail({ to: pop.user.email, bookingNumber: pop.bookingNumber, vehicleName: pop.vehicle.name || `${pop.vehicle.brand} ${pop.vehicle.model}`, pickupDate: sDate, returnDate: eDate, totalAmount: pop.totalAmount }); }catch(e){ console.log("Email fail:", e.message) }
+    res.status(201).json(pop);
+  } catch (err) { console.log(err); res.status(500).json({ message: err.message }); }
+});
+
+const myBookingsHandler = async (req,res)=>{
+  try{
+    const bookings = await Booking.find({ user: req.user.id }).populate('vehicle').sort({createdAt: -1});
+    res.json(bookings);
+  }catch(e){ res.status(500).json({message: e.message}) }
+};
+router.get('/my', auth, myBookingsHandler);
+router.get('/mybookings', auth, myBookingsHandler);
+
+// ===== COMPLETE - 100% FIX, NO VALIDATION =====
+router.put('/:id/complete', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const updated = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { status: 'COMPLETED', paymentStatus: 'PAID' },
+      { new: true, runValidators: false }
+    ).populate('vehicle').populate('user','name email');
+    if (!updated) return res.status(404).json({ message: "Booking not found" });
+    res.json({ message: "Booking completed successfully", booking: updated });
+  } catch (e) {
+    console.log("Complete Error:", e.message);
+    res.status(500).json({ message: e.message });
   }
 });
 
-router.get('/my', auth, async (req,res)=>{
-  const bookings = await Booking.find({ user: req.user.id }).populate('vehicle');
-  res.json(bookings);
+router.put('/:id/cancel', auth, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (booking.user.toString() !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ message: "Not authorized" });
+    if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') return res.status(400).json({ message: `Booking is already ${booking.status}` });
+    const updated = await Booking.findByIdAndUpdate(req.params.id, { status: 'CANCELLED' }, { new: true, runValidators: false });
+    if (updated.couponCode) {
+      const c = await Coupon.findOne({ code: updated.couponCode });
+      if (c && c.usedCount > 0) { c.usedCount -= 1; await c.save(); }
+    }
+    res.json({ message: "Booking cancelled successfully", booking: updated });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+router.put('/:id/reschedule', auth, async (req, res) => {
+  try {
+    const { pickupDate, returnDate, startDate, endDate } = req.body;
+    const sDate = pickupDate || startDate;
+    const eDate = returnDate || endDate;
+    if(!sDate || !eDate) return res.status(400).json({ message: "New dates required" });
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (booking.user.toString() !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ message: "Not authorized" });
+    if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') return res.status(400).json({ message: `Cannot reschedule ${booking.status}` });
+    const newPickup = new Date(sDate); const newReturn = new Date(eDate);
+    if(newReturn <= newPickup) return res.status(400).json({ message: "Return date must be after pickup date" });
+    const days = Math.ceil((newReturn - newPickup) / (1000*60*60*24)) || 1;
+    const updated = await Booking.findByIdAndUpdate(req.params.id, {
+      previousPickupDate: booking.pickupDate, previousReturnDate: booking.returnDate,
+      pickupDate: newPickup, returnDate: newReturn, startDate: newPickup, endDate: newReturn,
+      rentalDays: days, totalAmount: days * booking.pricePerDay - (booking.discount || 0),
+      originalAmount: days * booking.pricePerDay, isRescheduled: true, rescheduledAt: new Date(), status: 'CONFIRMED'
+    }, { new: true, runValidators: false }).populate('vehicle').populate('user','name email');
+    res.json({ message: "Booking rescheduled successfully", booking: updated });
+  } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 router.get('/:id', auth, async (req,res)=>{
-  if(req.params.id.includes('booked-dates') || req.params.id.includes('check-availability')) return res.json({});
-  const booking = await Booking.findById(req.params.id).populate('vehicle');
-  res.json(booking);
+  try{
+    if(['my','mybookings','all-debug'].includes(req.params.id) || req.params.id.includes('booked-dates')) return res.status(400).json({message: "Invalid ID"});
+    const booking = await Booking.findById(req.params.id).populate('vehicle').populate('user','name email phone');
+    if(!booking) return res.status(404).json({ message: "Booking not found" });
+    if(booking.user._id.toString() !== req.user.id && req.user.role !== 'admin') return res.status(403).json({message: "Not authorized"});
+    res.json(booking);
+  }catch(e){ res.status(500).json({ message: e.message }); }
 });
 
 export default router;
