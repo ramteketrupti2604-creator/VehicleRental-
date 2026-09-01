@@ -22,7 +22,7 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'Token is not valid' });
     }
     
-    next(); // ye line sabse important hai
+    next(); 
 
   } catch (err) {
     res.status(401).json({ message: 'Token is not valid' });

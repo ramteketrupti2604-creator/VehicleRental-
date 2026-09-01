@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
     if (userInfo && userInfo !== "undefined") {
       try {
         const parsed = JSON.parse(userInfo);
-        // Agar parsed me user nested hai toh handle karo
+        
         setUser(parsed.user || parsed);
       } catch {}
     }
@@ -28,13 +28,11 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const { data } = await axios.post('http://localhost:5000/api/users/login', { email, password });
     
-    // FIX: backend 2 tarah ka response de sakta hai
-    // Case 1: { user: {...}, token } 
-    // Case 2: { _id, name, email, role, token }
+    
     const actualUser = data.user || data;
     const actualToken = data.token || actualUser.token;
 
-    console.log("LOGIN RESPONSE:", data); // debug ke liye
+    console.log("LOGIN RESPONSE:", data); 
     console.log("USER ROLE:", actualUser.role);
 
     setUser(actualUser);

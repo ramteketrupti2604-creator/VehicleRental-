@@ -8,7 +8,7 @@ import cloudinary from '../utils/cloudinary.js';
 
 const router = express.Router();
 
-// Cloudinary upload helper
+
 const uploadToCloudinary = (fileBuffer) => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -22,7 +22,7 @@ const uploadToCloudinary = (fileBuffer) => {
   });
 };
 
-// ========== GET ALL VEHICLES ==========
+
 router.get('/', async (req, res) => {
   try {
     const { search, location, category, fuelType, transmission, minPrice, maxPrice, sort, page = 1, limit = 50 } = req.query;
@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// ========== CHECK AVAILABILITY ==========
+
 router.get('/check-availability', async (req, res) => {
   try {
     const { vehicleId, pickupDate, returnDate } = req.query;
@@ -71,19 +71,19 @@ router.get('/check-availability', async (req, res) => {
   } catch(e) { res.status(500).json({ message: e.message }) }
 });
 
-// ========== ADMIN GET ALL ==========
+
 router.get('/admin/all', protect, admin, async (req, res) => {
   try { const vehicles = await Vehicle.find({}).populate('category', 'name').sort({ createdAt: -1 }); res.json(vehicles); }
   catch (e) { res.status(500).json({ message: e.message }) }
 });
 
-// ========== GET BY ID ==========
+
 router.get('/:id', async (req, res) => {
   try { const v = await Vehicle.findById(req.params.id).populate('category', 'name'); if (!v) return res.status(404).json({ message: 'Vehicle not found' }); res.json(v); }
   catch (e) { res.status(500).json({ message: e.message }) }
 });
 
-// ========== ADD VEHICLE ==========
+
 router.post('/', protect, admin, upload.single('image'), async (req, res) => {
   try {
     let data = {...req.body };
@@ -132,7 +132,7 @@ router.post('/', protect, admin, upload.single('image'), async (req, res) => {
   }
 });
 
-// ========== UPDATE VEHICLE ==========
+
 router.put('/:id', protect, admin, upload.single('image'), async (req, res) => {
   try {
     let updateData = {...req.body };
@@ -157,13 +157,13 @@ router.put('/:id', protect, admin, upload.single('image'), async (req, res) => {
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-// ========== DELETE ==========
+
 router.delete('/:id', protect, admin, async (req, res) => {
   try { const v = await Vehicle.findByIdAndDelete(req.params.id); if (!v) return res.status(404).json({ message: 'Not found' }); res.json({ message: 'Vehicle deleted successfully' }); }
   catch (e) { res.status(500).json({ message: e.message }) }
 });
 
-// ========== STATUS ==========
+
 router.patch('/:id/status', protect, admin, async (req, res) => {
   try { const { status } = req.body; const vehicle = await Vehicle.findByIdAndUpdate(req.params.id, { status: status.toUpperCase() }, { new: true }).populate('category', 'name'); res.json(vehicle); }
   catch (e) { res.status(500).json({ message: e.message }) }

@@ -15,8 +15,8 @@ const options = {
       }
     }
   },
-  // YE LINE SABSE IMPORTANT HAI - Yahi galat hogi tumhari
-  apis: ['./routes/*.js', './server.js'], // agar routes folder me hai
+ 
+  apis: ['./routes/*.js', './server.js'], 
 };
 
 const swaggerSpec = swaggerJSDoc(options);

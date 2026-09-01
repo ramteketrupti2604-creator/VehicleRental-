@@ -40,10 +40,10 @@ describe("Vehicle Rental - Automated Tests", () => {
   });
 
   test("3. Add Vehicle (Admin)", async () => {
-    // Pehle Category banao
+    
     const cat = await Category.create({ name: "Hatchback", description: "Hatchback Cars" });
     
-    // Ab Vehicle sahi fields ke saath banao - DIRECT DB se taaki validation pass ho
+    
     const vehicle = await Vehicle.create({
       name: "Swift Test",
       brand: "Maruti",

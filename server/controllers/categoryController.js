@@ -1,4 +1,4 @@
-// CREATE - Duplicate check with proper message
+
 exports.createCategory = async (req, res) => {
   try {
     const { name } = req.body;
@@ -16,7 +16,6 @@ exports.createCategory = async (req, res) => {
   }
 };
 
-// DELETE - Check vehicles
 exports.deleteCategory = async (req, res) => {
   const vehiclesCount = await Vehicle.countDocuments({ category: req.params.id });
   if (vehiclesCount > 0) {

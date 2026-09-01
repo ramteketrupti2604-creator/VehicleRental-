@@ -11,15 +11,15 @@ import User from '../models/userModel.js';
 
 const router = express.Router();
 
-// Public
+
 router.post('/login', authUser);
 router.post('/register', registerUser);
 
-// Customer - Profile (IMPORTANT: /profile route /:id se upar hona chahiye)
+
 router.get('/profile', protect, getUserProfile);
 router.put('/profile', protect, async (req, res) => {
   try {
-    // agar tumhare controller me updateUserProfile nahi hai to ye fallback kaam karega
+    
     if (typeof updateUserProfile === 'function') {
       return updateUserProfile(req, res);
     }
@@ -29,7 +29,7 @@ router.put('/profile', protect, async (req, res) => {
     user.name = req.body.name || user.name;
     user.phone = req.body.phone || user.phone;
     
-    // email update allow nahi karna
+    
     const updatedUser = await user.save();
     
     res.json({
@@ -45,8 +45,8 @@ router.put('/profile', protect, async (req, res) => {
   }
 });
 
-// Admin - Customers
-router.get('/', protect, admin, getAllCustomers); // GET /api/users
-router.get('/customers', protect, admin, getAllCustomers); // GET /api/users/customers alias
+
+router.get('/', protect, admin, getAllCustomers); 
+router.get('/customers', protect, admin, getAllCustomers); 
 
 export default router;

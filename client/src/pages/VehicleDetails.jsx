@@ -31,7 +31,7 @@ const VehicleDetails = () => {
       } catch { toast.error('Vehicle not found'); } finally { setLoading(false); }
 
       try {
-        // Per vehicle API - Sirf isi gaadi ki dates
+        
         const res = await axios.get(`${API_URL}/api/bookings/vehicle/${id}/booked-dates`);
         const dates = (res.data.bookedDates || []).map(d => {
           const date = new Date(d);

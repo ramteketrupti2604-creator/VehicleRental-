@@ -6,11 +6,10 @@ import { protect, admin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Middleware - saare routes admin ke liye protected
+
 router.use(protect, admin);
 
-// ================== DASHBOARD STATS ==================
-// Assignment Point 12: Total Vehicles, Available, Active Bookings, Customers, Revenue + Recent Bookings
+
 const getDashboardStats = async (req, res) => {
   try {
     const totalVehicles = await Vehicle.countDocuments();
@@ -18,7 +17,7 @@ const getDashboardStats = async (req, res) => {
     const activeBookings = await Booking.countDocuments({ status: { $in: ['PENDING', 'CONFIRMED'] } });
     const totalCustomers = await User.countDocuments({ role: { $ne: 'admin' } });
 
-    // Total Revenue - Cancelled ko exclude karke
+    
     const revAgg = await Booking.aggregate([
       { $match: { status: { $ne: 'CANCELLED' } } },
       { $group: { _id: null, total: { $sum: '$totalAmount' } } }
@@ -44,12 +43,11 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
-// Dono routes same function pe point karenge - tera frontend /dashboard call kar raha tha
+
 router.get('/stats', getDashboardStats);
 router.get('/dashboard', getDashboardStats);
 
-// ================== CUSTOMERS ==================
-// Assignment Point 13: Name, Email, Phone, Number of bookings, Registration date, Account status
+
 router.get('/customers', async (req, res) => {
   try {
     const customers = await User.aggregate([
@@ -84,7 +82,7 @@ router.get('/customers', async (req, res) => {
   }
 });
 
-// ================== ALL BOOKINGS FOR ADMIN ==================
+
 router.get('/bookings', async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
@@ -111,7 +109,7 @@ router.get('/bookings', async (req, res) => {
   }
 });
 
-// ================== REVENUE STATS (For Chart - Bonus) ==================
+
 router.get('/revenue', async (req, res) => {
   try {
     const monthlyRevenue = await Booking.aggregate([

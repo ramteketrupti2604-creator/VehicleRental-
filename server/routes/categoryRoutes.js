@@ -5,7 +5,7 @@ import Vehicle from '../models/vehicleModel.js';
 
 const router = express.Router();
 
-// GET all - Public + Admin
+
 router.get('/', async (req, res) => {
   try {
     const categories = await Category.find().sort({ name: 1 });
@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST add - Admin only
+
 router.post('/', protect, admin, async (req, res) => {
   try {
     const { name } = req.body;
@@ -31,7 +31,7 @@ router.post('/', protect, admin, async (req, res) => {
   }
 });
 
-// PUT edit - Admin only
+
 router.put('/:id', protect, admin, async (req, res) => {
   try {
     const category = await Category.findByIdAndUpdate(req.params.id, { name: req.body.name }, { new: true });
@@ -42,13 +42,13 @@ router.put('/:id', protect, admin, async (req, res) => {
   }
 });
 
-// DELETE - FIXED: Check vehicles linked
+
 router.delete('/:id', protect, admin, async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
     if (!category) return res.status(404).json({ message: 'Category not found' });
 
-    // Check both string and populated category
+    
     const count1 = await Vehicle.countDocuments({ category: category.name });
     const count2 = await Vehicle.countDocuments({ category: category._id });
     const totalLinked = count1 + count2;

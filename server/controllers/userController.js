@@ -2,8 +2,7 @@ import User from '../models/userModel.js';
 import Booking from '../models/bookingModel.js';
 import generateToken from '../utils/generateToken.js';
 
-// @desc Auth user & get token
-// @route POST /api/users/login
+
 export const authUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -26,8 +25,7 @@ export const authUser = async (req, res) => {
   }
 };
 
-// @desc Register a new user
-// @route POST /api/users/register
+
 export const registerUser = async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
@@ -53,13 +51,12 @@ export const registerUser = async (req, res) => {
   }
 };
 
-// @desc Get user profile
-// @route GET /api/users/profile
+
 export const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     if (user) {
-      // bookings count for profile card
+      
       const totalBookings = await Booking.countDocuments({ user: user._id });
       res.json({
         _id: user._id,
@@ -78,16 +75,14 @@ export const getUserProfile = async (req, res) => {
   }
 };
 
-// @desc Update user profile
-// @route PUT /api/users/profile
+
 export const updateUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (user) {
       user.name = req.body.name || user.name;
       user.phone = req.body.phone || user.phone;
-      // email update block - security
-
+      
       const updatedUser = await user.save();
       const totalBookings = await Booking.countDocuments({ user: updatedUser._id });
 
@@ -108,8 +103,7 @@ export const updateUserProfile = async (req, res) => {
   }
 };
 
-// @desc Get all customers with stats - Admin
-// @route GET /api/users
+
 export const getAllCustomers = async (req, res) => {
   try {
     const users = await User.find({ role: { $ne: 'admin' } })

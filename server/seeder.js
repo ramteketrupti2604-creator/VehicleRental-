@@ -35,8 +35,7 @@ const importData = async () => {
       { name: 'Admin User', email: 'admin@test.com', phone: '9999999999', password: '123456', role: 'admin' },
       { name: 'Test Customer', email: 'customer@test.com', phone: '8888888888', password: '123456', role: 'user' }
     ]);
-    // NOTE: password yaha plain de, model ke pre-save hook se hash hoga
-
+    
     const vehicles = [
       { name: 'Maruti Swift', brand: 'Maruti Suzuki', model: 'VXI', category: catMap['Hatchback'], registrationNumber: 'MH31AB1001', year: 2023, fuelType: 'Petrol', transmission: 'Manual', seats: 5, pricePerDay: 1500, location: 'Nagpur', images: ['https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=600&q=80'], description: 'Fuel efficient city car', features: ['AC','Music'], status: 'AVAILABLE' },
       { name: 'Hyundai Creta', brand: 'Hyundai', model: 'SX', category: catMap['SUV'], registrationNumber: 'MH31AB1002', year: 2024, fuelType: 'Diesel', transmission: 'Automatic', seats: 5, pricePerDay: 3500, location: 'Nagpur', images: ['https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=600&q=80'], description: 'Premium SUV', features: ['Sunroof'], status: 'AVAILABLE' },

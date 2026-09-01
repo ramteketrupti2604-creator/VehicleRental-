@@ -1,7 +1,7 @@
 import express from 'express';
 const router = express.Router();
 
-// MOCK PAYMENT - No real money needed
+
 router.post('/create-order', (req, res) => {
   const { amount } = req.body;
   // Mock Razorpay order ID
@@ -16,7 +16,7 @@ router.post('/create-order', (req, res) => {
 });
 
 router.post('/verify', (req, res) => {
-  // Always success for demo - Assignment ke liye
+  
   res.json({ success: true, message: 'Payment Verified (Mock)', paymentId: 'pay_' + Date.now() });
 });
 

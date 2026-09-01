@@ -4,7 +4,7 @@ import { MapPin, Fuel, Users, Settings2 } from 'lucide-react';
 export default function VehicleCard({ vehicle }) {
   const imageUrl = vehicle.images?.[0] || vehicle.image || 'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?auto=compress&cs=tinysrgb&w=600';
 
-  // Fix: Ford Ford double name hatana
+  
   const displayName = vehicle.name?.toLowerCase().startsWith(vehicle.brand?.toLowerCase())
    ? vehicle.name
     : `${vehicle.brand} ${vehicle.name}`;

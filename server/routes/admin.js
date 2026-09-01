@@ -5,4 +5,4 @@ router.get('/dashboard', protect, admin, (req,res) => {
   res.json({message: "Admin API working"});
 });
 
-module.exports = router; // <-- ye line important hai
+module.exports = router; 

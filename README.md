@@ -67,15 +67,15 @@ client/
 *Backend*
 cd server
 npm install
-npm run dev
-http://localhost:5000
-http://localhost:5000/api-docs - Swagger Docs
+ node server.js
+# Backend: http://localhost:5000
+# Swagger: http://localhost:5000/api-docs
 
-*Frontend*
+Frontend:
 cd client
 npm install
-npm run dev
-http://localhost:3000
+npm start
+# Frontend: http://localhost:3000
 
 ### 🔧 .env Example
 MONGO_URI=your_mongodb_uri
@@ -87,6 +87,15 @@ CLOUDINARY_API_SECRET=...
 EMAIL_USER=your_email
 EMAIL_PASS=your_app_password
 VITE_API_URL=http://localhost:5000/api
+
+📚 API Documentation
+Swagger UI available at http://localhost:5000/api-docs
+Interactive API testing with "Try it out"
+Auth via Bearer Token
+
+🎁 Bonus Features Implemented
+✓ Cloudinary Upload ✓ Nodemailer Email ✓ PDF Receipt ✓ Revenue Analytics Chart 
+✓ Ratings & Reviews ✓ Google Maps ✓ Coupon WELCOME10 ✓ Reschedule ✓ Swagger Docs
 
 ### 👩‍💻 Developed By
 *Trupti Ramteke* | Full Stack Internship Project | 2026

@@ -7,7 +7,7 @@ import { sendBookingEmail } from '../utils/sendEmail.js';
 
 const router = express.Router();
 
-// ===== DEBUG - 30 latest bookings =====
+
 router.get('/all-debug', async (req, res) => {
   try {
     const bookings = await Booking.find({}).sort({createdAt: -1}).limit(30).populate('vehicle');
@@ -15,7 +15,7 @@ router.get('/all-debug', async (req, res) => {
   } catch(e) { res.json({ error: e.message }); }
 });
 
-// ===== CHECK AVAILABILITY =====
+
 router.post('/check-availability', auth, async (req, res) => {
   try {
     const { vehicleId, pickupDate, returnDate, startDate, endDate } = req.body;
@@ -52,7 +52,7 @@ router.post('/check-availability', auth, async (req, res) => {
   }
 });
 
-// ===== BOOKED DATES FOR CALENDAR =====
+
 const bookedDatesHandler = async (req, res) => {
   try {
     const vehicleId = req.params.vehicleId || req.params.id;
@@ -73,7 +73,7 @@ const bookedDatesHandler = async (req, res) => {
 router.get('/vehicle/:vehicleId/booked-dates', bookedDatesHandler);
 router.get('/:vehicleId/booked-dates', bookedDatesHandler);
 
-// ===== CREATE BOOKING =====
+
 router.post('/', auth, async (req, res) => {
   try {
     const { vehicleId, vehicle, startDate, endDate, pickupDate, returnDate, pickupLocation, couponCode } = req.body;
@@ -149,7 +149,7 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// ===== MY BOOKINGS =====
+
 const myBookingsHandler = async (req,res)=>{
   try{
     const bookings = await Booking.find({ user: req.user.id }).populate('vehicle').sort({createdAt: -1});
@@ -159,7 +159,7 @@ const myBookingsHandler = async (req,res)=>{
 router.get('/my', auth, myBookingsHandler);
 router.get('/mybookings', auth, myBookingsHandler);
 
-// ===== COMPLETE BOOKING - FINAL FIX =====
+
 router.put('/:id/complete', auth, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -180,7 +180,7 @@ router.put('/:id/complete', auth, async (req, res) => {
   }
 });
 
-// ===== CANCEL BOOKING =====
+
 router.put('/:id/cancel', auth, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
@@ -210,7 +210,7 @@ router.put('/:id/cancel', auth, async (req, res) => {
   }
 });
 
-// ===== RESCHEDULE BOOKING =====
+
 router.put('/:id/reschedule', auth, async (req, res) => {
   try {
     const { pickupDate, returnDate, startDate, endDate } = req.body;
@@ -265,7 +265,7 @@ router.put('/:id/reschedule', auth, async (req, res) => {
   }
 });
 
-// ===== GET ONE BOOKING - SABSE LAST ME =====
+
 router.get('/:id', auth, async (req,res)=>{
   try{
     if(req.params.id === 'my' || req.params.id === 'mybookings' || req.params.id.includes('booked-dates') || req.params.id === 'all-debug') {

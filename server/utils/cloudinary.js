@@ -21,7 +21,7 @@ console.log("Cloudinary check:", {
   api_secret: process.env.CLOUDINARY_API_SECRET? "Found ✅" : "MISSING ❌"
 });
 
-// memory me rakhenge, phir khud upload karenge
+
 const storage = multer.memoryStorage();
 export const upload = multer({
   storage,

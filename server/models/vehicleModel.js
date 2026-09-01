@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const vehicleSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   brand: { type: String, required: true, trim: true },
-  model: { type: String, required: true, trim: true }, // Variant ke liye
+  model: { type: String, required: true, trim: true }, 
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
@@ -21,7 +21,7 @@ const vehicleSchema = new mongoose.Schema({
   features: [{ type: String }],
   status: {
     type: String,
-    enum: ['AVAILABLE', 'UNAVAILABLE', 'MAINTENANCE'], // Assignment ke hisab se exact
+    enum: ['AVAILABLE', 'UNAVAILABLE', 'MAINTENANCE'], 
     default: 'AVAILABLE'
   }
 }, { timestamps: true });

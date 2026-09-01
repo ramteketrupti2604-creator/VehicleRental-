@@ -38,12 +38,12 @@ export const getVehicles = async (req, res) => {
     if (sort === 'price_high' || sort === 'priceHighLow') sortOption = { pricePerDay: -1 };
     if (sort === 'latest' || sort === 'newest') sortOption = { createdAt: -1 };
 
-    // Pehle bina price ke saare vehicles nikalo
+    
     let vehicles = await Vehicle.find(filter)
       .populate('category', 'name')
       .sort(sortOption);
 
-    // AB JS ME PRICE FILTER - 100% kaam karega
+    
     if (minPrice!== '' && minPrice!== undefined || maxPrice!== '' && maxPrice!== undefined) {
       const min = minPrice!== '' && minPrice!== undefined ? Number(minPrice) : 0;
       const max = maxPrice!== '' && maxPrice!== undefined ? Number(maxPrice) : 9999999;

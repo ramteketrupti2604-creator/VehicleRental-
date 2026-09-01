@@ -4,7 +4,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 let mongo;
 
 export const connect = async () => {
-  // Agar pehle se koi connection hai to usko band karo
+  
   if (mongoose.connection.readyState!== 0) {
     await mongoose.disconnect();
   }

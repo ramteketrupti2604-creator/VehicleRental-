@@ -14,7 +14,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
-import seedRoute from './routes/seedRoute.js'; // <-- YEH LINE 1 ADDED
+import seedRoute from './routes/seedRoute.js'; 
 import Coupon from './models/couponModel.js';
 
 import { protect, admin } from './middleware/authMiddleware.js';
@@ -35,7 +35,7 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ===== FIXED SWAGGER CONFIG - AB SAHI DIKHEGA =====
+
 const swaggerOptions = {
   definition: {
     openapi: "3.0.0",
@@ -81,7 +81,6 @@ const swaggerOptions = {
 };
 const swaggerSpecs = swaggerJsDoc(swaggerOptions);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs, { explorer: true }));
-// ===== SWAGGER FIX END =====
 
 const statsLogic = async (req, res) => {
   try {
@@ -106,7 +105,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/coupons', couponRoutes);
-app.use('/api/seed', seedRoute); // <-- YEH LINE 2 ADDED
+app.use('/api/seed', seedRoute); 
 
 app.get('/api/bookings/vehicle/:id/booked-dates', async (req, res) => {
   try {
@@ -194,7 +193,7 @@ app.get('/api/bookings/:id', protect, async (req, res) => {
   } catch(e){ res.status(500).json({ message: e.message }) } 
 });
 
-// ===== CANCEL BOOKING - 24HR FIX - FINAL =====
+
 app.put('/api/bookings/:id/cancel', protect, async (req,res) => { 
   try { 
     const booking = await Booking.findById(req.params.id); 
@@ -233,7 +232,7 @@ app.put('/api/bookings/:id/cancel', protect, async (req,res) => {
   } 
 });
 
-// ===== RESCHEDULE ROUTE - FINAL FIX - NO AVAILABILITY CHECK =====
+
 app.put('/api/bookings/:id/reschedule', protect, async (req, res) => {
   try {
     console.log("RESCHEDULE HIT -> ID:", req.params.id, "BODY:", req.body);
@@ -263,7 +262,7 @@ app.put('/api/bookings/:id/reschedule', protect, async (req, res) => {
       return res.status(400).json({ message: "Return date must be after pickup date" });
     }
 
-    // Availability check intentionally removed for assignment
+    
     const days = Math.ceil((newReturn - newPickup) / (1000*60*60*24)) || 1;
     
     booking.pickupDate = newPickup;
@@ -284,7 +283,7 @@ app.put('/api/bookings/:id/reschedule', protect, async (req, res) => {
   }
 });
 
-// ===== ADMIN STATUS UPDATE - YEHI TUMHARA ERROR FIX KAREGA =====
+
 app.put('/api/bookings/:id/status', protect, admin, async (req,res) => { 
   try { 
     const { status } = req.body;
@@ -306,7 +305,7 @@ app.put('/api/bookings/:id/status', protect, admin, async (req,res) => {
   } 
 });
 
-// Extra routes for direct complete/cancel from admin panel
+
 app.put('/api/bookings/:id/complete', protect, admin, async (req,res) => { 
   try { 
     const booking = await Booking.findById(req.params.id); 
@@ -336,7 +335,7 @@ app.put('/api/admin/bookings/:id/status', protect, admin, async (req,res) => {
 
 app.get('/', (req, res) => res.send('Vehicle Rental API Running... ✅'));
 
-// ===== FORCE START - AB PAKKA CONNECT HOGA =====
+
 console.log("Connecting to MongoDB...");
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
