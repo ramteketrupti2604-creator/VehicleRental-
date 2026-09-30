@@ -1,9 +1,19 @@
+import crypto from 'crypto';
+try {
+  if (!globalThis.crypto) {
+    globalThis.crypto = crypto;
+  }
+} catch (e) {
+  console.log("Crypto already exists in Node 24, skipping assignment");
+}
+
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import cors from 'cors';
+import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsDoc from 'swagger-jsdoc';
 
@@ -14,9 +24,8 @@ import adminRoutes from './routes/adminRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
-import seedRoute from './routes/seedRoute.js'; 
+import seedRoute from './routes/seedRoute.js';
 import Coupon from './models/couponModel.js';
-
 import { protect, admin } from './middleware/authMiddleware.js';
 import Booking from "./models/bookingModel.js";
 import Vehicle from "./models/vehicleModel.js";
@@ -27,24 +36,34 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-console.log("ENV -> MONGO_URI:", process.env.MONGO_URI ? "Found ✅ " : "MISSING ❌");
+console.log("ENV -> MONGO_URI:", process.env.MONGO_URI? "Found ✅ " : "MISSING ❌");
 console.log("ENV -> PORT:", process.env.PORT || 5000);
 
 const app = express();
-app.use(cors({ origin: true, credentials: true }));
+
+app.disable('x-powered-by');
+app.set('etag', false);
+
+// --- ZAP FIX 1: Secure CORS ---
+app.use(cors({
+  origin: ["http://localhost:3000", "https://vehicle-rental-5eb2.vercel.app"],
+  credentials: true,
+  methods: ["GET","POST","PUT","DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 
 const swaggerOptions = {
   definition: {
     openapi: "3.0.0",
-    info: { 
-      title: "Vehicle Rental System API", 
+    info: {
+      title: "Vehicle Rental System API",
       version: "1.0.0",
-      description: "MERN Stack Internship Assignment - Complete API Documentation" 
+      description: "MERN Stack Internship Assignment - Complete API Documentation"
     },
-    servers: [{ url: "http://localhost:5000" }],
+    servers: [{ url: "http://localhost:5000" }, { url: "https://vehicle-rental-5eb2.vercel.app" }],
     components: {
       securitySchemes: {
         bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
@@ -80,7 +99,66 @@ const swaggerOptions = {
   apis: [],
 };
 const swaggerSpecs = swaggerJsDoc(swaggerOptions);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs, { explorer: true }));
+
+// --- ZAP FIX 4: /api-docs ko Helmet se pehle rakho taaki uspar strict CSP na lage ---
+const zapFixForDocs = (req, res, next) => {
+  if (req.path === '/' || req.path === '' || req.path.includes('.')) {
+    return next();
+  }
+  return res.status(404).type('application/json').json({
+    message: `Route /api-docs${req.path} not found`
+  });
+};
+
+app.use("/api-docs", zapFixForDocs, swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
+  explorer: true,
+  customCss: ".swagger-ui.topbar { display: none }",
+  swaggerOptions: { persistAuthorization: true }
+}));
+
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpecs);
+});
+
+// --- ZAP FIX 2: FINAL 0-WARN HELMET - Strict for API (No unsafe-inline) ---
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: ["'self'", "https:", "data:", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"]
+    }
+  },
+  crossOriginEmbedderPolicy: { policy: "require-corp" },
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "same-origin" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  hsts: { maxAge: 31536000, includeSubDomains: true },
+  noSniff: true,
+  frameguard: { action: 'deny' },
+}));
+
+// --- ZAP FIX 3: Permissions-Policy & Cache-Control ---
+app.use((req, res, next) => {
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  if (req.path.startsWith('/api')) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  } else if (req.path === '/sitemap.xml' || req.path === '/robots.txt' || req.path === '/' || req.path === '/api-docs.json') {
+    res.setHeader("Cache-Control", "public, max-age=3600");
+  }
+  res.removeHeader("X-Powered-By");
+  res.removeHeader("ETag");
+  next();
+});
 
 const statsLogic = async (req, res) => {
   try {
@@ -105,12 +183,12 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/coupons', couponRoutes);
-app.use('/api/seed', seedRoute); 
+app.use('/api/seed', seedRoute);
 
 app.get('/api/bookings/vehicle/:id/booked-dates', async (req, res) => {
   try {
     const bookings = await Booking.find({ vehicle: req.params.id, status: { $in: ['PENDING', 'CONFIRMED'] } });
-    let allDates = []; bookings.forEach(b => { let curr = new Date(b.pickupDate || b.startDate); let end = new Date(b.returnDate || b.endDate); curr.setHours(0,0,0,0); end.setHours(0,0,0,0); while(curr <= end){ allDates.push(new Date(curr)); curr.setDate(curr.getDate()+1);} }); 
+    let allDates = []; bookings.forEach(b => { let curr = new Date(b.pickupDate || b.startDate); let end = new Date(b.returnDate || b.endDate); curr.setHours(0,0,0,0); end.setHours(0,0,0,0); while(curr <= end){ allDates.push(new Date(curr)); curr.setDate(curr.getDate()+1);} });
     res.json({ bookedDates: allDates });
   } catch(e){ res.json({ bookedDates: [] }); }
 });
@@ -118,7 +196,7 @@ app.get('/api/bookings/vehicle/:id/booked-dates', async (req, res) => {
 app.get('/api/vehicles/:id/booked-dates', async (req, res) => {
   try {
     const bookings = await Booking.find({ vehicle: req.params.id, status: { $ne: 'CANCELLED' } });
-    let allDates = []; bookings.forEach(b => { let curr = new Date(b.pickupDate || b.startDate); let end = new Date(b.returnDate || b.endDate); curr.setHours(0,0,0,0); end.setHours(0,0,0,0); while(curr <= end){ allDates.push(new Date(curr)); curr.setDate(curr.getDate()+1);} }); 
+    let allDates = []; bookings.forEach(b => { let curr = new Date(b.pickupDate || b.startDate); let end = new Date(b.returnDate || b.endDate); curr.setHours(0,0,0,0); end.setHours(0,0,0,0); while(curr <= end){ allDates.push(new Date(curr)); curr.setDate(curr.getDate()+1);} });
     res.json({ bookedDates: allDates });
   } catch(e){ res.json({ bookedDates: [] }); }
 });
@@ -126,29 +204,29 @@ app.get('/api/vehicles/:id/booked-dates', async (req, res) => {
 app.post('/api/bookings', protect, async (req,res) => {
   try {
     const { vehicle, pickupDate, returnDate, pickupLocation, couponCode } = req.body;
-    const pickup = new Date(pickupDate); const returnD = new Date(returnDate); 
-    if (!pickupDate || !returnDate) return res.status(400).json({ message: "Dates required" });
+    const pickup = new Date(pickupDate); const returnD = new Date(returnDate);
+    if (!pickupDate ||!returnDate) return res.status(400).json({ message: "Dates required" });
     const vehicleDoc = await Vehicle.findById(vehicle);
     if (!vehicleDoc) return res.status(404).json({ message: "Vehicle not found" });
     const overlapping = await Booking.findOne({ vehicle: vehicle, status: { $in: ['PENDING','CONFIRMED'] }, pickupDate: { $lt: returnD }, returnDate: { $gt: pickup } });
     if (overlapping) return res.status(400).json({ message: "Already booked" });
-    const days = Math.ceil((returnD - pickup)/(1000*60*60*24)) || 1; 
+    const days = Math.ceil((returnD - pickup)/(1000*60*60*24)) || 1;
     let total = days * vehicleDoc.pricePerDay; let discount = 0; let appliedCoupon = null;
-    if(couponCode){ 
-      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true }); 
+    if(couponCode){
+      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
       if(coupon && new Date(coupon.expiryDate) > new Date()){
-        discount = coupon.discountType === 'PERCENT'? (total * coupon.discountValue / 100) : coupon.discountValue; 
-        if(coupon.maxDiscount) discount = Math.min(discount, coupon.maxDiscount); 
-        total = total - discount; appliedCoupon = coupon.code; 
-        coupon.usedCount += 1; await coupon.save(); 
+        discount = coupon.discountType === 'PERCENT'? (total * coupon.discountValue / 100) : coupon.discountValue;
+        if(coupon.maxDiscount) discount = Math.min(discount, coupon.maxDiscount);
+        total = total - discount; appliedCoupon = coupon.code;
+        coupon.usedCount += 1; await coupon.save();
       }
     }
-    const booking = await Booking.create({ 
-      bookingNumber: `VR-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(1000+Math.random()*9000)}`, 
-      vehicle, user: req.user._id, pickupDate: pickup, returnDate: returnD, rentalDays: days, 
-      totalAmount: total, pricePerDay: vehicleDoc.pricePerDay, 
-      pickupLocation: pickupLocation || vehicleDoc.location, status: 'CONFIRMED', paymentStatus: 'PENDING', 
-      couponCode: appliedCoupon, discountAmount: discount 
+    const booking = await Booking.create({
+      bookingNumber: `VR-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(1000+Math.random()*9000)}`,
+      vehicle, user: req.user._id, pickupDate: pickup, returnDate: returnD, rentalDays: days,
+      totalAmount: total, pricePerDay: vehicleDoc.pricePerDay,
+      pickupLocation: pickupLocation || vehicleDoc.location, status: 'CONFIRMED', paymentStatus: 'PENDING',
+      couponCode: appliedCoupon, discountAmount: discount
     });
     const populated = await Booking.findById(booking._id).populate('vehicle').populate('user','name email');
     try { await sendBookingEmail({ to: populated.user.email, bookingNumber: populated.bookingNumber, vehicleName: populated.vehicle.name, pickupDate: populated.pickupDate.toDateString(), returnDate: populated.returnDate.toDateString(), totalAmount: populated.totalAmount }); } catch(e){ console.log("Email fail:", e.message); }
@@ -156,197 +234,178 @@ app.post('/api/bookings', protect, async (req,res) => {
   } catch(e){ res.status(400).json({ message: e.message }) }
 });
 
-app.get('/api/bookings/my', protect, async (req, res) => { 
-  try { 
-    const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 }); 
-    res.json(bookings); 
-  } catch(e){ res.status(500).json({ message: e.message }) } 
+app.get('/api/bookings/my', protect, async (req, res) => {
+  try {
+    const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 });
+    res.json(bookings);
+  } catch(e){ res.status(500).json({ message: e.message }) }
 });
-app.get('/api/bookings/mybookings', protect, async (req, res) => { 
-  try { 
-    const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 }); 
-    res.json(bookings); 
-  } catch(e){ res.status(500).json({ message: e.message }) } 
+app.get('/api/bookings/mybookings', protect, async (req, res) => {
+  try {
+    const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 });
+    res.json(bookings);
+  } catch(e){ res.status(500).json({ message: e.message }) }
 });
-app.get('/api/bookings/my-bookings', protect, async (req, res) => { 
-  try { 
-    const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 }); 
-    res.json(bookings); 
-  } catch(e){ res.status(500).json({ message: e.message }) } 
-});
-
-app.get('/api/bookings', protect, admin, async (req, res) => { 
-  try { 
-    const bookings = await Booking.find({}).populate("vehicle").populate("user","name email phone").sort({ createdAt: -1 }); 
-    res.json(bookings); 
-  } catch(e){ res.status(500).json({ message: e.message }) } 
+app.get('/api/bookings/my-bookings', protect, async (req, res) => {
+  try {
+    const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 });
+    res.json(bookings);
+  } catch(e){ res.status(500).json({ message: e.message }) }
 });
 
-app.get('/api/bookings/:id', protect, async (req, res) => { 
-  try { 
+app.get('/api/bookings', protect, admin, async (req, res) => {
+  try {
+    const bookings = await Booking.find({}).populate("vehicle").populate("user","name email phone").sort({ createdAt: -1 });
+    res.json(bookings);
+  } catch(e){ res.status(500).json({ message: e.message }) }
+});
+
+app.get('/api/bookings/:id', protect, async (req, res) => {
+  try {
     const id = req.params.id;
     if(id === 'my' || id === 'mybookings' || id === 'vehicle') return res.status(400).json({ message: "Invalid ID" });
-    console.log("Fetching Booking ID:", id);
-    const booking = await Booking.findById(id).populate("vehicle").populate("user","name email phone"); 
-    if (!booking) return res.status(404).json({ message: "Booking not found" }); 
-    res.json(booking); 
-  } catch(e){ res.status(500).json({ message: e.message }) } 
+    const booking = await Booking.findById(id).populate("vehicle").populate("user","name email phone");
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    res.json(booking);
+  } catch(e){ res.status(500).json({ message: e.message }) }
 });
 
-
-app.put('/api/bookings/:id/cancel', protect, async (req,res) => { 
-  try { 
-    const booking = await Booking.findById(req.params.id); 
-    if (!booking) return res.status(404).json({ message: "Booking not found" }); 
-
-    if (booking.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+app.put('/api/bookings/:id/cancel', protect, async (req,res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (booking.user.toString()!== req.user._id.toString() && req.user.role!== 'admin') {
       return res.status(403).json({ message: "Not authorized to cancel this booking" });
     }
-
     if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') {
       return res.status(400).json({ message: `Booking is already ${booking.status}` });
     }
-
     const now = new Date();
     const pickup = new Date(booking.pickupDate || booking.startDate);
     const hoursLeft = (pickup - now) / (1000 * 60 * 60);
-    
-    console.log(`CANCEL CHECK -> Pickup: ${pickup.toLocaleString()} | Now: ${now.toLocaleString()} | HoursLeft: ${hoursLeft.toFixed(2)}`);
-
     if (hoursLeft < 24) {
       return res.status(400).json({ message: "Cannot cancel within 24 hours of pickup time" });
     }
-
-    booking.status = 'CANCELLED'; 
-    await booking.save(); 
-
+    booking.status = 'CANCELLED';
+    await booking.save();
     if (booking.couponCode) {
       const c = await Coupon.findOne({ code: booking.couponCode });
       if (c && c.usedCount > 0) { c.usedCount -= 1; await c.save(); }
     }
-
-    res.json({ message: "Booking cancelled successfully", booking }); 
-  } catch(e){ 
-    console.log("Cancel Error:", e.message);
-    res.status(500).json({ message: e.message }) 
-  } 
+    res.json({ message: "Booking cancelled successfully", booking });
+  } catch(e){
+    res.status(500).json({ message: e.message })
+  }
 });
-
 
 app.put('/api/bookings/:id/reschedule', protect, async (req, res) => {
   try {
-    console.log("RESCHEDULE HIT -> ID:", req.params.id, "BODY:", req.body);
     const { pickupDate, returnDate, startDate, endDate } = req.body;
     const sDate = pickupDate || startDate;
     const eDate = returnDate || endDate;
-
-    if(!sDate || !eDate){
+    if(!sDate ||!eDate){
       return res.status(400).json({ message: "New pickup and return dates required" });
     }
-
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-    if (booking.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (booking.user.toString()!== req.user._id.toString() && req.user.role!== 'admin') {
       return res.status(403).json({ message: "Not authorized" });
     }
-
     if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') {
       return res.status(400).json({ message: `Cannot reschedule ${booking.status} booking` });
     }
-
     const newPickup = new Date(sDate);
     const newReturn = new Date(eDate);
-
     if(newReturn <= newPickup){
       return res.status(400).json({ message: "Return date must be after pickup date" });
     }
-
-    
     const days = Math.ceil((newReturn - newPickup) / (1000*60*60*24)) || 1;
-    
     booking.pickupDate = newPickup;
     booking.returnDate = newReturn;
     booking.rentalDays = days;
     booking.totalAmount = days * booking.pricePerDay;
     booking.status = 'CONFIRMED';
-
     await booking.save();
     const updated = await Booking.findById(booking._id).populate('vehicle').populate('user','name email');
-
-    console.log("RESCHEDULE SUCCESS ->", updated.bookingNumber);
     res.json({ message: "Booking rescheduled successfully", booking: updated });
-
   } catch (e) {
-    console.log("Reschedule Error:", e.message);
     res.status(500).json({ message: e.message });
   }
 });
 
-
-app.put('/api/bookings/:id/status', protect, admin, async (req,res) => { 
-  try { 
+app.put('/api/bookings/:id/status', protect, admin, async (req,res) => {
+  try {
     const { status } = req.body;
-    const booking = await Booking.findById(req.params.id); 
-    if (!booking) return res.status(404).json({ message: "Booking not found" }); 
-    
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
     if(!['CONFIRMED','CANCELLED','COMPLETED','PENDING'].includes(status)){
       return res.status(400).json({ message: "Invalid status: " + status });
     }
-
-    booking.status = status; 
+    booking.status = status;
     if(status === 'COMPLETED') booking.paymentStatus = 'PAID';
-    await booking.save(); 
-    console.log(`ADMIN STATUS UPDATE -> ${booking.bookingNumber} -> ${status}`);
-    res.json({ message: `Booking ${status} successfully`, booking }); 
-  } catch(e){ 
-    console.log("Status Update Error:", e.message);
-    res.status(500).json({ message: e.message }) 
-  } 
+    await booking.save();
+    res.json({ message: `Booking ${status} successfully`, booking });
+  } catch(e){
+    res.status(500).json({ message: e.message })
+  }
 });
 
-
-app.put('/api/bookings/:id/complete', protect, admin, async (req,res) => { 
-  try { 
-    const booking = await Booking.findById(req.params.id); 
-    if (!booking) return res.status(404).json({ message: "Booking not found" }); 
-    booking.status = 'COMPLETED'; 
+app.put('/api/bookings/:id/complete', protect, admin, async (req,res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    booking.status = 'COMPLETED';
     booking.paymentStatus = 'PAID';
-    await booking.save(); 
-    res.json({ message: "Booking completed", booking }); 
-  } catch(e){ 
-    res.status(500).json({ message: e.message }) 
-  } 
+    await booking.save();
+    res.json({ message: "Booking completed", booking });
+  } catch(e){
+    res.status(500).json({ message: e.message })
+  }
 });
 
-app.put('/api/admin/bookings/:id/status', protect, admin, async (req,res) => { 
-  try { 
+app.put('/api/admin/bookings/:id/status', protect, admin, async (req,res) => {
+  try {
     const { status } = req.body;
-    const booking = await Booking.findById(req.params.id); 
-    if (!booking) return res.status(404).json({ message: "Booking not found" }); 
-    booking.status = status; 
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    booking.status = status;
     if(status === 'COMPLETED') booking.paymentStatus = 'PAID';
-    await booking.save(); 
-    res.json({ message: `Booking ${status} successfully`, booking }); 
-  } catch(e){ 
-    res.status(500).json({ message: e.message }) 
-  } 
+    await booking.save();
+    res.json({ message: `Booking ${status} successfully`, booking });
+  } catch(e){
+    res.status(500).json({ message: e.message })
+  }
 });
 
-app.get('/', (req, res) => res.send('Vehicle Rental API Running... ✅'));
+app.get('/', (req, res) => res.json({ status: "Vehicle Rental API Running... ✅", version: "1.0.0", secure: true }));
+app.get('/sitemap.xml', (req, res) => {
+  res.type('application/xml');
+  res.send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://vehicle-rental-5eb2.vercel.app/</loc></url></urlset>`);
+});
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.send("User-agent: *\nAllow: /\n");
+});
 
+app.use((req, res) => {
+  res.status(404).type('application/json').json({
+    message: `Route ${req.originalUrl} not found`
+  });
+});
 
 console.log("Connecting to MongoDB...");
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
+.then(() => {
     console.log('MongoDB Connected ✅');
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-      console.log(`Server Running: http://localhost:${PORT}`);
+    const HOST = '0.0.0.0';
+    app.listen(PORT, HOST, () => {
+      console.log(`Server Running: http://${HOST}:${PORT}`);
+      console.log(`Local: http://localhost:${PORT}`);
       console.log(`Docs: http://localhost:${PORT}/api-docs`);
     });
   })
-  .catch(err => {
+.catch(err => {
     console.error("MongoDB Failed ❌:", err.message);
   });
 
