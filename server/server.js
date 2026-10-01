@@ -51,7 +51,10 @@ app.use(cors({
     "https://vehicle-rental-5eb2.vercel.app",
     "https://vehicle-rental-ayme-frontend-mdgq6xg5l.vercel.app",
     "https://vehicle-rental-ayme-frontend.vercel.app",
-    "https://vehicle-rental-ayme-frontend-mdgq6xg5l-trupti-patil-aymes-projects.vercel.app"
+    "https://vehicle-rental-ayme-frontend-mdgq6xg5l-trupti-patil-aymes-projects.vercel.app",
+    "https://vehicle-rental-ayme-frontend1-kblfdmsoh.vercel.app",
+    "https://vehicle-rental-ayme-frontend1.vercel.app",
+    "https://vehicle-rental-ayme-frontend1-trupti-patil-aymes-projects.vercel.app"
   ],
   credentials: true,
   methods: ["GET","POST","PUT","DELETE"],
