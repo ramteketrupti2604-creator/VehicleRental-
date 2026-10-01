@@ -44,9 +44,15 @@ const app = express();
 app.disable('x-powered-by');
 app.set('etag', false);
 
-// --- ZAP FIX 1: Secure CORS ---
+// --- ZAP FIX 1: Secure CORS - FIXED FOR YOUR NEW FRONTEND ✅ ---
 app.use(cors({
-  origin: ["http://localhost:3000", "https://vehicle-rental-5eb2.vercel.app"],
+  origin: [
+    "http://localhost:3000",
+    "https://vehicle-rental-5eb2.vercel.app",
+    "https://vehicle-rental-ayme-frontend-mdgq6xg5l.vercel.app",
+    "https://vehicle-rental-ayme-frontend.vercel.app",
+    "https://vehicle-rental-ayme-frontend-mdgq6xg5l-trupti-patil-aymes-projects.vercel.app"
+  ],
   credentials: true,
   methods: ["GET","POST","PUT","DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"]
