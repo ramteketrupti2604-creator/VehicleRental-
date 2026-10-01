@@ -1,12 +1,44 @@
 import { Link } from 'react-router-dom';
 import { MapPin, Fuel, Users, Settings2 } from 'lucide-react';
 
-export default function VehicleCard({ vehicle }) {
-  const imageUrl = vehicle.images?.[0] || vehicle.image || 'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?auto=compress&cs=tinysrgb&w=600';
+// --- FINAL IMAGE FIX ✅ - DIRECT FROM /public/cars ---
+const getImageUrl = (vehicle) => {
+  const rawPath = vehicle?.images?.[0] || vehicle?.image || "";
 
-  
+  // agar already pura http url hai to wahi
+  if (rawPath.startsWith('http')) return rawPath;
+
+  // agar path me filename hai to usko nikal lo
+  if (rawPath) {
+    const fileName = rawPath.split('/').pop(); // bmw.jpg
+    if (fileName && fileName.includes('.')) {
+      return `/cars/${fileName}`;
+    }
+  }
+
+  // agar DB me path khali hai to naam se map karo
+  const name = (vehicle?.name || "").toLowerCase();
+  if (name.includes('bmw')) return '/cars/bmw.jpg';
+  if (name.includes('swift')) return '/cars/swift.jpg';
+  if (name.includes('baleno')) return '/cars/baleno.jpg';
+  if (name.includes('thar')) return '/cars/thar.jpg';
+  if (name.includes('nexon')) return '/cars/nexon.jpg';
+  if (name.includes('city')) return '/cars/city.jpg';
+  if (name.includes('creta')) return '/cars/creta.jpg';
+  if (name.includes('fortuner')) return '/cars/fortuner.jpg';
+  if (name.includes('innova')) return '/cars/innova.jpg';
+  if (name.includes('scorpio')) return '/cars/scorpio.jpg';
+  if (name.includes('alto')) return '/cars/alto.jpg';
+  if (name.includes('ertiga')) return '/cars/ertiga.jpg';
+
+  return '/cars/bmw.jpg'; // default fallback
+};
+
+export default function VehicleCard({ vehicle }) {
+  const imageUrl = getImageUrl(vehicle);
+
   const displayName = vehicle.name?.toLowerCase().startsWith(vehicle.brand?.toLowerCase())
-   ? vehicle.name
+ ? vehicle.name
     : `${vehicle.brand} ${vehicle.name}`;
 
   return (
@@ -19,7 +51,7 @@ export default function VehicleCard({ vehicle }) {
           loading="lazy"
           onError={(e) => {
             e.currentTarget.onerror = null;
-            e.currentTarget.src = 'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?auto=compress&cs=tinysrgb&w=600';
+            e.currentTarget.src = '/cars/bmw.jpg';
           }}
         />
         <span className={`absolute top-3 left-3 px-3 py-1 text-[10px] font-black rounded-full shadow backdrop-blur ${vehicle.status==='AVAILABLE'? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
