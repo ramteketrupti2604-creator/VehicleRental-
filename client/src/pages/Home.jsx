@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { Search, MapPin, Users, Fuel, Cog, ArrowRight, IndianRupee, RotateCcw } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || "https://vehicle-rental-backend-n8fa.onrender.com";
+const API_URL = import.meta.env.VITE_API_URL || `${BASE_URL}/api`;
 
 export default function Home() {
   const [vehicles, setVehicles] = useState([]);
@@ -33,7 +34,7 @@ export default function Home() {
       if (minPrice!== '') params.minPrice = Number(minPrice);
       if (maxPrice!== '') params.maxPrice = Number(maxPrice);
 
-      const { data } = await axios.get(`${API_URL}/api/vehicles`, { params });
+      const { data } = await axios.get(`${API_URL}/vehicles`, { params });
       setVehicles(data.vehicles || []);
       setTotalPages(data.totalPages || 1);
     } catch (err) {
@@ -45,7 +46,7 @@ export default function Home() {
 
   const fetchCategories = async () => {
     try {
-      const { data } = await axios.get(`${API_URL}/api/categories`);
+      const { data } = await axios.get(`${API_URL}/categories`);
       setCategories(Array.isArray(data)? data : data.categories || []);
     } catch {}
   };
@@ -71,6 +72,13 @@ export default function Home() {
     setSearch(''); setCategory(''); setLocation(''); setFuelType('');
     setTransmission(''); setMinPrice(''); setMaxPrice(''); setSort(''); setPage(1);
     setTimeout(() => { window.location.reload(); }, 100);
+  };
+
+  const getImageUrl = (img) => {
+    if (!img) return "";
+    if (img.startsWith('http')) return img;
+    if (img.startsWith('/cars') || img.startsWith('/')) return `${BASE_URL}${img}`;
+    return img;
   };
 
   return (
@@ -164,7 +172,7 @@ export default function Home() {
               <div key={v._id} className="group bg-white rounded-[18px] overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
                 <div className="relative h-[185px] bg-slate-100 overflow-hidden">
                   <img
-                    src={v.images?.[0]}
+                    src={getImageUrl(v.images?.[0])}
                     alt={v.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-700"
                     onError={(e) => {
