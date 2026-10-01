@@ -54,7 +54,8 @@ app.use(cors({
     "https://vehicle-rental-ayme-frontend-mdgq6xg5l-trupti-patil-aymes-projects.vercel.app",
     "https://vehicle-rental-ayme-frontend1-kblfdmsoh.vercel.app",
     "https://vehicle-rental-ayme-frontend1.vercel.app",
-    "https://vehicle-rental-ayme-frontend1-trupti-patil-aymes-projects.vercel.app"
+    "https://vehicle-rental-ayme-frontend1-trupti-patil-aymes-projects.vercel.app",
+    "https://vehicle-rental-ayme-frontend1-obmzxxt668.vercel.app"
   ],
   credentials: true,
   methods: ["GET","POST","PUT","DELETE"],
@@ -63,6 +64,12 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// --- IMAGE FIX ADDED ✅ - YE 4 LINES ADD KI HAI ---
+app.use('/cars', express.static(path.join(__dirname, 'public/cars')));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+app.use('/images', express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 const swaggerOptions = {
   definition: {
@@ -109,7 +116,6 @@ const swaggerOptions = {
 };
 const swaggerSpecs = swaggerJsDoc(swaggerOptions);
 
-// --- ZAP FIX 4: /api-docs ko Helmet se pehle rakho taaki uspar strict CSP na lage ---
 const zapFixForDocs = (req, res, next) => {
   if (req.path === '/' || req.path === '' || req.path.includes('.')) {
     return next();
@@ -137,17 +143,17 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "https://fonts.googleapis.com"],
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "https:", "data:", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", "https://vehicle-rental-backend-n8fa.onrender.com", "http://localhost:3000", "https://*.vercel.app"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"]
     }
   },
-  crossOriginEmbedderPolicy: { policy: "require-corp" },
+  crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: { policy: "same-origin" },
-  crossOriginResourcePolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   hsts: { maxAge: 31536000, includeSubDomains: true },
   noSniff: true,
