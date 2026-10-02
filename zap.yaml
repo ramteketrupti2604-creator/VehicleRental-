@@ -17,7 +17,7 @@ jobs:
     url: https://vehicle-rental-5eb2.vercel.app
   type: spider
 - parameters:
-    maxDuration: 5
+    maxDuration: 0
   type: passiveScan-wait
 - parameters:
     format: Long
@@ -27,7 +27,7 @@ jobs:
 - parameters:
     reportDescription: ''
     reportDir: /zap/wrk/
-    reportFile: frontend_report.html
+    reportFile: frontend_fixed_report.html
     reportTitle: ZAP Scanning Report
     template: traditional-html
   type: report
