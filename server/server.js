@@ -1,12 +1,3 @@
-import crypto from 'crypto';
-try {
-  if (!globalThis.crypto) {
-    globalThis.crypto = crypto;
-  }
-} catch (e) {
-  console.log("Crypto already exists in Node 24, skipping assignment");
-}
-
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -44,7 +35,7 @@ const app = express();
 app.disable('x-powered-by');
 app.set('etag', false);
 
-// --- ZAP FIX 1: Secure CORS - FIXED FOR YOUR NEW FRONTEND ✅ ---
+// --- ZAP FIX 1: Secure CORS - FIXED ✅ ---
 app.use(cors({
   origin: [
     "http://localhost:3000",
@@ -65,7 +56,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- IMAGE FIX ADDED ✅ - YE 4 LINES ADD KI HAI ---
+// --- IMAGE FIX ---
 app.use('/cars', express.static(path.join(__dirname, 'public/cars')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 app.use('/images', express.static(path.join(__dirname, 'public')));
@@ -136,7 +127,7 @@ app.get('/api-docs.json', (req, res) => {
   res.send(swaggerSpecs);
 });
 
-// --- ZAP FIX 2: FINAL 0-WARN HELMET - Strict for API (No unsafe-inline) ---
+// --- ZAP FIX 2: FINAL 0-WARN HELMET ---
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -151,25 +142,21 @@ app.use(helmet({
       formAction: ["'self'"]
     }
   },
-  crossOriginEmbedderPolicy: false,
+  crossOriginEmbedderPolicy: { policy: "require-corp" },
   crossOriginOpenerPolicy: { policy: "same-origin" },
-  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginResourcePolicy: { policy: "same-origin" },
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   hsts: { maxAge: 31536000, includeSubDomains: true },
   noSniff: true,
   frameguard: { action: 'deny' },
 }));
 
-// --- ZAP FIX 3: Permissions-Policy & Cache-Control ---
+// --- ZAP FIX 3: Permissions-Policy & Cache-Control - 0 WARN ke liye fix ---
 app.use((req, res, next) => {
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
-  if (req.path.startsWith('/api')) {
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-  } else if (req.path === '/sitemap.xml' || req.path === '/robots.txt' || req.path === '/' || req.path === '/api-docs.json') {
-    res.setHeader("Cache-Control", "public, max-age=3600");
-  }
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   res.removeHeader("X-Powered-By");
   res.removeHeader("ETag");
   next();
