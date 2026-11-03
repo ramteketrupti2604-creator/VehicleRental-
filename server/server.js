@@ -35,19 +35,73 @@ const app = express();
 app.disable('x-powered-by');
 app.set('etag', false);
 
-// --- ZAP FIX 1: Secure CORS - FIXED ✅ ---
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      scriptSrcElem: ["'self'"],
+      scriptSrcAttr: ["'none'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      styleSrcAttr: ["'none'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "https://vehicle-rental-backend-n8fa.onrender.com", "http://localhost:3000", "http://localhost:5000", "https://vehicle-rental-5eb2.vercel.app"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      mediaSrc: ["'self'"],
+      workerSrc: ["'self'"],
+      frameSrc: ["'self'"],
+      manifestSrc: ["'self'"],
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "same-site" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  noSniff: true,
+  frameguard: { action: 'deny' },
+  hidePoweredBy: true,
+}));
+
+app.use((req, res, next) => {
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  if (req.path.startsWith('/api') || req.path.startsWith('/api-docs')) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+  res.removeHeader("X-Powered-By");
+  res.removeHeader("ETag");
+  res.removeHeader("Server");
+  next();
+});
+
 app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://vehicle-rental-5eb2.vercel.app",
-    "https://vehicle-rental-ayme-frontend-mdgq6xg5l.vercel.app",
-    "https://vehicle-rental-ayme-frontend.vercel.app",
-    "https://vehicle-rental-ayme-frontend-mdgq6xg5l-trupti-patil-aymes-projects.vercel.app",
-    "https://vehicle-rental-ayme-frontend1-kblfdmsoh.vercel.app",
-    "https://vehicle-rental-ayme-frontend1.vercel.app",
-    "https://vehicle-rental-ayme-frontend1-trupti-patil-aymes-projects.vercel.app",
-    "https://vehicle-rental-ayme-frontend1-obmzxxt668.vercel.app"
-  ],
+  origin: (origin, callback) => {
+    const allowed = [
+      "http://localhost:3000",
+      "http://localhost:5000",
+      "https://vehicle-rental-5eb2.vercel.app",
+      "https://vehicle-rental-ayme-frontend-mdgq6xg5l.vercel.app",
+      "https://vehicle-rental-ayme-frontend.vercel.app",
+      "https://vehicle-rental-ayme-frontend-mdgq6xg5l-trupti-patil-aymes-projects.vercel.app",
+      "https://vehicle-rental-ayme-frontend1-kblfdmsoh.vercel.app",
+      "https://vehicle-rental-ayme-frontend1.vercel.app",
+      "https://vehicle-rental-ayme-frontend1-trupti-patil-aymes-projects.vercel.app",
+      "https://vehicle-rental-ayme-frontend1-obmzxxt668.vercel.app"
+    ];
+    if (!origin || allowed.includes(origin) || origin.endsWith(".vercel.app")) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
   methods: ["GET","POST","PUT","DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"]
@@ -56,33 +110,18 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- IMAGE FIX ---
-app.use('/cars', express.static(path.join(__dirname, 'public/cars')));
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
-app.use('/images', express.static(path.join(__dirname, 'public')));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use('/cars', express.static(path.join(__dirname, 'public/cars'), { maxAge: '7d', etag: true }));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), { maxAge: '7d', etag: true }));
+app.use('/images', express.static(path.join(__dirname, 'public'), { maxAge: '7d', etag: true }));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d', etag: true }));
 
 const swaggerOptions = {
   definition: {
     openapi: "3.0.0",
-    info: {
-      title: "Vehicle Rental System API",
-      version: "1.0.0",
-      description: "MERN Stack Internship Assignment - Complete API Documentation"
-    },
+    info: { title: "Vehicle Rental System API", version: "1.0.0", description: "MERN Stack Internship Assignment - Complete API Documentation" },
     servers: [{ url: "http://localhost:5000" }, { url: "https://vehicle-rental-5eb2.vercel.app" }],
-    components: {
-      securitySchemes: {
-        bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
-      }
-    },
-    tags: [
-      { name: "Auth", description: "Authentication" },
-      { name: "Vehicles", description: "Vehicle listing & details" },
-      { name: "Bookings", description: "Rental & Booking logic - Availability check" },
-      { name: "Admin", description: "Admin Dashboard & Stats" },
-      { name: "Categories", description: "Vehicle Categories" },
-    ],
+    components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } } },
+    tags: [ { name: "Auth" }, { name: "Vehicles" }, { name: "Bookings" }, { name: "Admin" }, { name: "Categories" } ],
     paths: {
       "/": { get: { summary: "API Running Check", tags: ["Auth"], responses: { 200: { description: "OK" } } } },
       "/api/auth/login": { post: { summary: "Login - Customer/Admin", tags: ["Auth"], requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { email: { type: "string" }, password: { type: "string" } } } } } }, responses: { 200: { description: "Login success" } } } },
@@ -90,77 +129,42 @@ const swaggerOptions = {
       "/api/vehicles": { get: { summary: "Get Vehicles - Search, Filter, Sort, Pagination", tags: ["Vehicles"], parameters: [{ name: "search", in: "query", schema: { type: "string" } }, { name: "category", in: "query", schema: { type: "string" } }, { name: "location", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Vehicle list" } } } },
       "/api/vehicles/{id}": { get: { summary: "Vehicle Details by ID", tags: ["Vehicles"], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Vehicle detail" } } } },
       "/api/vehicles/{id}/booked-dates": { get: { summary: "Get Booked Dates for calendar blocking", tags: ["Vehicles"], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Booked dates" } } } },
-      "/api/bookings": {
-        post: { summary: "Create Booking - Backend calculates price & checks overlapping", tags: ["Bookings"], security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { vehicle: { type: "string" }, pickupDate: { type: "string" }, returnDate: { type: "string" }, pickupLocation: { type: "string" }, couponCode: { type: "string" } } } } } }, responses: { 201: { description: "Booking confirmed" } } },
-        get: { summary: "All Bookings - Admin only", tags: ["Bookings"], security: [{ bearerAuth: [] }], responses: { 200: { description: "All bookings" } } }
-      },
-      "/api/bookings/my": { get: { summary: "My Bookings - Current User", tags: ["Bookings"], security: [{ bearerAuth: [] }], responses: { 200: { description: "My bookings" } } } },
+      "/api/bookings": { post: { summary: "Create Booking", tags: ["Bookings"], security: [{ bearerAuth: [] }], responses: { 201: { description: "Booking confirmed" } } }, get: { summary: "All Bookings - Admin only", tags: ["Bookings"], security: [{ bearerAuth: [] }], responses: { 200: { description: "All bookings" } } } },
+      "/api/bookings/my": { get: { summary: "My Bookings", tags: ["Bookings"], security: [{ bearerAuth: [] }], responses: { 200: { description: "My bookings" } } } },
       "/api/bookings/mybookings": { get: { summary: "My Bookings Alias", tags: ["Bookings"], security: [{ bearerAuth: [] }], responses: { 200: { description: "My bookings" } } } },
       "/api/bookings/{id}": { get: { summary: "Booking Details by ID", tags: ["Bookings"], security: [{ bearerAuth: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Booking details" } } } },
-      "/api/bookings/{id}/cancel": { put: { summary: "Cancel Booking - 24hr rule enforced", tags: ["Bookings"], security: [{ bearerAuth: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Cancelled" } } } },
-      "/api/bookings/{id}/status": { put: { summary: "Admin Update Booking Status - Complete/Cancel", tags: ["Bookings"], security: [{ bearerAuth: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Status updated" } } } },
-      "/api/admin/stats": { get: { summary: "Admin Dashboard Stats", tags: ["Admin"], security: [{ bearerAuth: [] }], responses: { 200: { description: "Stats: totalVehicles, availableVehicles, activeBookings, customers, revenue, recentBookings" } } } },
+      "/api/bookings/{id}/cancel": { put: { summary: "Cancel Booking", tags: ["Bookings"], security: [{ bearerAuth: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Cancelled" } } } },
+      "/api/bookings/{id}/status": { put: { summary: "Admin Update Booking Status", tags: ["Bookings"], security: [{ bearerAuth: [] }], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Status updated" } } } },
+      "/api/admin/stats": { get: { summary: "Admin Dashboard Stats", tags: ["Admin"], security: [{ bearerAuth: [] }], responses: { 200: { description: "Stats" } } } },
       "/api/categories": { get: { summary: "Get Categories", tags: ["Categories"], responses: { 200: { description: "Categories list" } } }, post: { summary: "Create Category - Admin", tags: ["Categories"], security: [{ bearerAuth: [] }], responses: { 201: { description: "Created" } } } }
     }
   },
-  apis: [],
+  apis: ["./routes/*.js"],
 };
 const swaggerSpecs = swaggerJsDoc(swaggerOptions);
 
 const zapFixForDocs = (req, res, next) => {
-  if (req.path === '/' || req.path === '' || req.path.includes('.')) {
-    return next();
-  }
-  return res.status(404).type('application/json').json({
-    message: `Route /api-docs${req.path} not found`
-  });
+  if (req.path === '/' || req.path === '' || req.path.includes('.')) { return next(); }
+  return res.status(404).type('application/json').json({ message: "Documentation route not found" });
 };
 
-app.use("/api-docs", zapFixForDocs, swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
-  explorer: true,
-  customCss: ".swagger-ui.topbar { display: none }",
-  swaggerOptions: { persistAuthorization: true }
-}));
-
-app.get('/api-docs.json', (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.send(swaggerSpecs);
-});
-
-// --- ZAP FIX 2: FINAL 0-WARN HELMET ---
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "https://fonts.googleapis.com"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
-      fontSrc: ["'self'", "https:", "data:", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", "https://vehicle-rental-backend-n8fa.onrender.com", "http://localhost:3000", "https://*.vercel.app"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"]
-    }
-  },
-  crossOriginEmbedderPolicy: { policy: "require-corp" },
-  crossOriginOpenerPolicy: { policy: "same-origin" },
-  crossOriginResourcePolicy: { policy: "same-origin" },
-  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-  hsts: { maxAge: 31536000, includeSubDomains: true },
-  noSniff: true,
-  frameguard: { action: 'deny' },
-}));
-
-// --- ZAP FIX 3: Permissions-Policy & Cache-Control - 0 WARN ke liye fix ---
-app.use((req, res, next) => {
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
-  res.removeHeader("X-Powered-By");
-  res.removeHeader("ETag");
-  next();
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.use("/api-docs", (req, res, next) => {
+    res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    next();
+  });
+  app.use("/api-docs", zapFixForDocs, swaggerUi.serve, swaggerUi.setup(swaggerSpecs, { explorer: true, customCss: ".swagger-ui.topbar { display: none }", swaggerOptions: { persistAuthorization: true } }));
+  app.get('/api-docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(swaggerSpecs);
+  });
+} else {
+  app.use("/api-docs", (req, res) => {
+    res.status(404).json({ message: "Docs disabled in production" });
+  });
+}
 
 const statsLogic = async (req, res) => {
   try {
@@ -173,11 +177,9 @@ const statsLogic = async (req, res) => {
     res.json({ totalVehicles, availableVehicles, activeBookings, totalCustomers, totalRevenue: revenueAgg[0]?.total || 0, recentBookings });
   } catch(e){ res.status(500).json({ message: e.message }) }
 };
-
 app.get('/api/admin/stats', protect, admin, statsLogic);
 app.get('/api/admin/dashboard', protect, admin, statsLogic);
 app.get('/api/dashboard-stats', protect, admin, statsLogic);
-
 app.use('/api/auth', authRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -186,7 +188,6 @@ app.use('/api/users', userRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/seed', seedRoute);
-
 app.get('/api/bookings/vehicle/:id/booked-dates', async (req, res) => {
   try {
     const bookings = await Booking.find({ vehicle: req.params.id, status: { $in: ['PENDING', 'CONFIRMED'] } });
@@ -194,7 +195,6 @@ app.get('/api/bookings/vehicle/:id/booked-dates', async (req, res) => {
     res.json({ bookedDates: allDates });
   } catch(e){ res.json({ bookedDates: [] }); }
 });
-
 app.get('/api/vehicles/:id/booked-dates', async (req, res) => {
   try {
     const bookings = await Booking.find({ vehicle: req.params.id, status: { $ne: 'CANCELLED' } });
@@ -202,7 +202,6 @@ app.get('/api/vehicles/:id/booked-dates', async (req, res) => {
     res.json({ bookedDates: allDates });
   } catch(e){ res.json({ bookedDates: [] }); }
 });
-
 app.post('/api/bookings', protect, async (req,res) => {
   try {
     const { vehicle, pickupDate, returnDate, pickupLocation, couponCode } = req.body;
@@ -235,33 +234,18 @@ app.post('/api/bookings', protect, async (req,res) => {
     res.status(201).json(populated);
   } catch(e){ res.status(400).json({ message: e.message }) }
 });
-
 app.get('/api/bookings/my', protect, async (req, res) => {
-  try {
-    const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 });
-    res.json(bookings);
-  } catch(e){ res.status(500).json({ message: e.message }) }
+  try { const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 }); res.json(bookings); } catch(e){ res.status(500).json({ message: e.message }) }
 });
 app.get('/api/bookings/mybookings', protect, async (req, res) => {
-  try {
-    const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 });
-    res.json(bookings);
-  } catch(e){ res.status(500).json({ message: e.message }) }
+  try { const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 }); res.json(bookings); } catch(e){ res.status(500).json({ message: e.message }) }
 });
 app.get('/api/bookings/my-bookings', protect, async (req, res) => {
-  try {
-    const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 });
-    res.json(bookings);
-  } catch(e){ res.status(500).json({ message: e.message }) }
+  try { const bookings = await Booking.find({ user: req.user._id }).populate("vehicle").sort({ createdAt: -1 }); res.json(bookings); } catch(e){ res.status(500).json({ message: e.message }) }
 });
-
 app.get('/api/bookings', protect, admin, async (req, res) => {
-  try {
-    const bookings = await Booking.find({}).populate("vehicle").populate("user","name email phone").sort({ createdAt: -1 });
-    res.json(bookings);
-  } catch(e){ res.status(500).json({ message: e.message }) }
+  try { const bookings = await Booking.find({}).populate("vehicle").populate("user","name email phone").sort({ createdAt: -1 }); res.json(bookings); } catch(e){ res.status(500).json({ message: e.message }) }
 });
-
 app.get('/api/bookings/:id', protect, async (req, res) => {
   try {
     const id = req.params.id;
@@ -271,128 +255,75 @@ app.get('/api/bookings/:id', protect, async (req, res) => {
     res.json(booking);
   } catch(e){ res.status(500).json({ message: e.message }) }
 });
-
 app.put('/api/bookings/:id/cancel', protect, async (req,res) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
-    if (booking.user.toString()!== req.user._id.toString() && req.user.role!== 'admin') {
-      return res.status(403).json({ message: "Not authorized to cancel this booking" });
-    }
-    if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') {
-      return res.status(400).json({ message: `Booking is already ${booking.status}` });
-    }
-    const now = new Date();
-    const pickup = new Date(booking.pickupDate || booking.startDate);
-    const hoursLeft = (pickup - now) / (1000 * 60 * 60);
-    if (hoursLeft < 24) {
-      return res.status(400).json({ message: "Cannot cancel within 24 hours of pickup time" });
-    }
-    booking.status = 'CANCELLED';
-    await booking.save();
-    if (booking.couponCode) {
-      const c = await Coupon.findOne({ code: booking.couponCode });
-      if (c && c.usedCount > 0) { c.usedCount -= 1; await c.save(); }
-    }
+    if (booking.user.toString()!== req.user._id.toString() && req.user.role!== 'admin') { return res.status(403).json({ message: "Not authorized to cancel this booking" }); }
+    if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') { return res.status(400).json({ message: `Booking is already ${booking.status}` }); }
+    const now = new Date(); const pickup = new Date(booking.pickupDate || booking.startDate); const hoursLeft = (pickup - now) / (1000 * 60 * 60);
+    if (hoursLeft < 24) { return res.status(400).json({ message: "Cannot cancel within 24 hours of pickup time" }); }
+    booking.status = 'CANCELLED'; await booking.save();
+    if (booking.couponCode) { const c = await Coupon.findOne({ code: booking.couponCode }); if (c && c.usedCount > 0) { c.usedCount -= 1; await c.save(); } }
     res.json({ message: "Booking cancelled successfully", booking });
-  } catch(e){
-    res.status(500).json({ message: e.message })
-  }
+  } catch(e){ res.status(500).json({ message: e.message }) }
 });
-
 app.put('/api/bookings/:id/reschedule', protect, async (req, res) => {
   try {
     const { pickupDate, returnDate, startDate, endDate } = req.body;
-    const sDate = pickupDate || startDate;
-    const eDate = returnDate || endDate;
-    if(!sDate ||!eDate){
-      return res.status(400).json({ message: "New pickup and return dates required" });
-    }
+    const sDate = pickupDate || startDate; const eDate = returnDate || endDate;
+    if(!sDate ||!eDate){ return res.status(400).json({ message: "New pickup and return dates required" }); }
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
-    if (booking.user.toString()!== req.user._id.toString() && req.user.role!== 'admin') {
-      return res.status(403).json({ message: "Not authorized" });
-    }
-    if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') {
-      return res.status(400).json({ message: `Cannot reschedule ${booking.status} booking` });
-    }
-    const newPickup = new Date(sDate);
-    const newReturn = new Date(eDate);
-    if(newReturn <= newPickup){
-      return res.status(400).json({ message: "Return date must be after pickup date" });
-    }
+    if (booking.user.toString()!== req.user._id.toString() && req.user.role!== 'admin') { return res.status(403).json({ message: "Not authorized" }); }
+    if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') { return res.status(400).json({ message: `Cannot reschedule ${booking.status} booking` }); }
+    const newPickup = new Date(sDate); const newReturn = new Date(eDate);
+    if(newReturn <= newPickup){ return res.status(400).json({ message: "Return date must be after pickup date" }); }
     const days = Math.ceil((newReturn - newPickup) / (1000*60*60*24)) || 1;
-    booking.pickupDate = newPickup;
-    booking.returnDate = newReturn;
-    booking.rentalDays = days;
-    booking.totalAmount = days * booking.pricePerDay;
-    booking.status = 'CONFIRMED';
+    booking.pickupDate = newPickup; booking.returnDate = newReturn; booking.rentalDays = days; booking.totalAmount = days * booking.pricePerDay; booking.status = 'CONFIRMED';
     await booking.save();
     const updated = await Booking.findById(booking._id).populate('vehicle').populate('user','name email');
     res.json({ message: "Booking rescheduled successfully", booking: updated });
-  } catch (e) {
-    res.status(500).json({ message: e.message });
-  }
+  } catch (e) { res.status(500).json({ message: e.message }); }
 });
-
 app.put('/api/bookings/:id/status', protect, admin, async (req,res) => {
   try {
-    const { status } = req.body;
-    const booking = await Booking.findById(req.params.id);
+    const { status } = req.body; const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
-    if(!['CONFIRMED','CANCELLED','COMPLETED','PENDING'].includes(status)){
-      return res.status(400).json({ message: "Invalid status: " + status });
-    }
-    booking.status = status;
-    if(status === 'COMPLETED') booking.paymentStatus = 'PAID';
-    await booking.save();
+    if(!['CONFIRMED','CANCELLED','COMPLETED','PENDING'].includes(status)){ return res.status(400).json({ message: "Invalid status: " + status }); }
+    booking.status = status; if(status === 'COMPLETED') booking.paymentStatus = 'PAID'; await booking.save();
     res.json({ message: `Booking ${status} successfully`, booking });
-  } catch(e){
-    res.status(500).json({ message: e.message })
-  }
+  } catch(e){ res.status(500).json({ message: e.message }) }
 });
-
 app.put('/api/bookings/:id/complete', protect, admin, async (req,res) => {
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
-    booking.status = 'COMPLETED';
-    booking.paymentStatus = 'PAID';
-    await booking.save();
+    booking.status = 'COMPLETED'; booking.paymentStatus = 'PAID'; await booking.save();
     res.json({ message: "Booking completed", booking });
-  } catch(e){
-    res.status(500).json({ message: e.message })
-  }
+  } catch(e){ res.status(500).json({ message: e.message }) }
 });
-
 app.put('/api/admin/bookings/:id/status', protect, admin, async (req,res) => {
   try {
-    const { status } = req.body;
-    const booking = await Booking.findById(req.params.id);
+    const { status } = req.body; const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
-    booking.status = status;
-    if(status === 'COMPLETED') booking.paymentStatus = 'PAID';
-    await booking.save();
+    booking.status = status; if(status === 'COMPLETED') booking.paymentStatus = 'PAID'; await booking.save();
     res.json({ message: `Booking ${status} successfully`, booking });
-  } catch(e){
-    res.status(500).json({ message: e.message })
-  }
+  } catch(e){ res.status(500).json({ message: e.message }) }
 });
-
 app.get('/', (req, res) => res.json({ status: "Vehicle Rental API Running... ✅", version: "1.0.0", secure: true }));
-app.get('/sitemap.xml', (req, res) => {
-  res.type('application/xml');
-  res.send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://vehicle-rental-5eb2.vercel.app/</loc></url></urlset>`);
-});
-app.get('/robots.txt', (req, res) => {
-  res.type('text/plain');
-  res.send("User-agent: *\nAllow: /\n");
+app.get('/sitemap.xml', (req, res) => { res.type('application/xml'); res.send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://vehicle-rental-5eb2.vercel.app/</loc></url></urlset>`); });
+app.get('/robots.txt', (req, res) => { res.type('text/plain'); res.send("User-agent: *\nAllow: /\n"); });
+
+// --- FINAL FIX: Serve React Build for Production / ZAP Scan ---
+const clientBuildPath = path.join(__dirname, '../client/build');
+app.use(express.static(clientBuildPath));
+app.get(/^\/(?!api|api-docs|sitemap|robots|cars|uploads|images).*/, (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
 
-app.use((req, res) => {
-  res.status(404).type('application/json').json({
-    message: `Route ${req.originalUrl} not found`
-  });
+app.use((req, res) => { 
+  res.status(404).type('application/json').json({ message: "Resource not found" }); 
 });
 
 console.log("Connecting to MongoDB...");
@@ -407,8 +338,5 @@ mongoose.connect(process.env.MONGO_URI)
       console.log(`Docs: http://localhost:${PORT}/api-docs`);
     });
   })
-.catch(err => {
-    console.error("MongoDB Failed ❌:", err.message);
-  });
-
+.catch(err => { console.error("MongoDB Failed ❌:", err.message); });
 export default app;
