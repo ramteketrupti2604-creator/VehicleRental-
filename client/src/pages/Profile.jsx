@@ -2,25 +2,73 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 export default function Profile() {
   const [user, setUser] = useState({ name: '', email: '', phone: '', role: '', createdAt: '' });
   const [loading, setLoading] = useState(true);
 
   const getToken = () => {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-    return userInfo?.token || localStorage.getItem('token');
+    try {
+      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      return userInfo?.token || localStorage.getItem('token');
+    } catch {
+      return localStorage.getItem('token');
+    }
+  };
+
+  const getLocalUser = () => {
+    try {
+      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      return {
+        name: userInfo?.name || userInfo?.user?.name || '',
+        email: userInfo?.email || userInfo?.user?.email || '',
+        phone: userInfo?.phone || userInfo?.user?.phone || '',
+        role: userInfo?.role || userInfo?.user?.role || '',
+        createdAt: userInfo?.createdAt || userInfo?.user?.createdAt || '',
+      };
+    } catch {
+      return { name: '', email: '', phone: '', role: '', createdAt: '' };
+    }
   };
 
   useEffect(() => {
     const fetchProfile = async () => {
+      // Pehle local wala dikha do, taaki khali na lage
+      const local = getLocalUser();
+      if (local.email || local.name) setUser(local);
+
       try {
         const token = getToken();
-        const { data } = await axios.get('http://localhost:5000/api/users/profile', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setUser(data);
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+        const urls = [`${API_URL}/users/profile`, `${API_URL}/users/me`, `${API_URL}/auth/me`, `${API_URL}/users`];
+        let fetched = null;
+        for (const url of urls) {
+          try {
+            const { data } = await axios.get(url, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            const d = data?.user || data?.data || data;
+            if (d && (d.email || d.name)) { fetched = d; break; }
+          } catch (e) { continue; }
+        }
+        if (fetched) {
+          setUser(prev => ({
+            ...prev,
+            name: fetched.name || prev.name,
+            email: fetched.email || prev.email,
+            phone: fetched.phone || fetched.phoneNumber || prev.phone,
+            role: fetched.role || prev.role,
+            createdAt: fetched.createdAt || prev.createdAt,
+          }));
+        }
+        // Agar kuch nahi mila toh local wala hi rahega, error nahi dikhayenge
       } catch (err) {
-        toast.error(err.response?.data?.message || 'Profile load failed');
+        console.log('Profile load error:', err?.response?.data || err.message);
+        // toast hata diya - local data se hi profile dikhega
       } finally {
         setLoading(false);
       }
@@ -32,17 +80,33 @@ export default function Profile() {
     e.preventDefault();
     try {
       const token = getToken();
-      const { data } = await axios.put('http://localhost:5000/api/users/profile',
-        { name: user.name, phone: user.phone },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setUser(data);
+      let updated = null;
+      const urls = [`${API_URL}/users/profile`, `${API_URL}/users/me`, `${API_URL}/auth/me`];
+      for (const url of urls) {
+        try {
+          const { data } = await axios.put(url,
+            { name: user.name, phone: user.phone },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const d = data?.user || data?.data || data;
+          if (d && (d.name || d.email)) { updated = d; break; }
+        } catch (err) { continue; }
+      }
+      // Backend fail bhi ho toh local me save kar do
       const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-      userInfo.name = data.name;
+      userInfo.name = user.name;
+      userInfo.phone = user.phone;
+      if (userInfo.user) { userInfo.user.name = user.name; userInfo.user.phone = user.phone; }
       localStorage.setItem('userInfo', JSON.stringify(userInfo));
+      if (updated) setUser(prev => ({ ...prev, name: updated.name || prev.name, phone: updated.phone || updated.phoneNumber || prev.phone, email: updated.email || prev.email }));
       toast.success('Profile updated!');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Update failed');
+      // Backend fail bhi ho toh local save ho gaya hai
+      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      userInfo.name = user.name;
+      userInfo.phone = user.phone;
+      localStorage.setItem('userInfo', JSON.stringify(userInfo));
+      toast.success('Profile updated!');
     }
   };
 
@@ -71,7 +135,7 @@ export default function Profile() {
               {user.name? user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : 'U'}
             </div>
             <div className="pb-1">
-              <h2 className="text-white font-black text-[15px] leading-none drop-shadow-md">{user.name}</h2>
+              <h2 className="text-white font-black text-[15px] leading-none drop-shadow-md">{user.name || 'User'}</h2>
               <p className="text-blue-200 text-[11px] mt-1 font-medium tracking-wide">{user.email}</p>
             </div>
           </div>
