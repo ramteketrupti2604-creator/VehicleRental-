@@ -3,7 +3,8 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+// Home.jsx jaisa fix - Vite wala + Render fallback
+const API_URL = import.meta.env.VITE_API_URL || "https://vehicle-rental-backend-n8fa.onrender.com/api";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -17,7 +18,6 @@ export const AuthProvider = ({ children }) => {
     if (userInfo && userInfo !== "undefined") {
       try {
         const parsed = JSON.parse(userInfo);
-        
         setUser(parsed.user || parsed);
       } catch {}
     }
@@ -29,12 +29,11 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const { data } = await axios.post(`${API_URL}/users/login`, { email, password });
-    
-    
+
     const actualUser = data.user || data;
     const actualToken = data.token || actualUser.token;
 
-    console.log("LOGIN RESPONSE:", data); 
+    console.log("LOGIN RESPONSE:", data);
     console.log("USER ROLE:", actualUser.role);
 
     setUser(actualUser);
