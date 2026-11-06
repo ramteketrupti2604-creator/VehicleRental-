@@ -5,6 +5,8 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || "https://vehicle-rental-backend-n8fa.onrender.com/api";
+
 const ManageVehicles = () => {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ const ManageVehicles = () => {
     if (!window.confirm(`Delete ${name}?`)) return;
     try {
       if(token){
-        await axios.delete(`http://localhost:5000/api/vehicles/${id}`, {
+        await axios.delete(`${API_URL}/vehicles/${id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
       } else {
@@ -46,7 +48,7 @@ const ManageVehicles = () => {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await axios.put(`http://localhost:5000/api/vehicles/${id}`,
+      await axios.put(`${API_URL}/vehicles/${id}`,
         { status: newStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
