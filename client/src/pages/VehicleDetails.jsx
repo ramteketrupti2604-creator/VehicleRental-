@@ -7,7 +7,7 @@ import { differenceInDays } from 'date-fns';
 import { Car, Fuel, Users, MapPin, Calendar, CheckCircle, Shield, ArrowRight, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "https://vehicle-rental-backend-n8fa.onrender.com/api";
 
 const VehicleDetails = () => {
   const { id } = useParams();
@@ -26,13 +26,13 @@ const VehicleDetails = () => {
   useEffect(() => {
     const fetchVehicleAndBookings = async () => {
       try {
-        const resVehicle = await axios.get(`${API_URL}/api/vehicles/${id}`);
+        const resVehicle = await axios.get(`${API_URL}/vehicles/${id}`);
         setVehicle(resVehicle.data.vehicle || resVehicle.data);
       } catch { toast.error('Vehicle not found'); } finally { setLoading(false); }
 
       try {
         
-        const res = await axios.get(`${API_URL}/api/bookings/vehicle/${id}/booked-dates`);
+        const res = await axios.get(`${API_URL}/bookings/vehicle/${id}/booked-dates`);
         const dates = (res.data.bookedDates || []).map(d => {
           const date = new Date(d);
           date.setHours(0,0,0,0);
@@ -69,6 +69,30 @@ const VehicleDetails = () => {
     navigate('/booking-summary', { state: { vehicle, pickupDate, returnDate, total, days } });
   };
 
+  // Image wala part bilkul same rakha hai, kuch change nahi kiya
+  const getImageUrl = () => {
+    const img = vehicle?.images?.[0] || vehicle?.image || "";
+    if (img.startsWith('http')) return img;
+    if (img) {
+      const fileName = img.split('/').pop();
+      if (fileName && fileName.includes('.')) return `/cars/${fileName}`;
+    }
+    const name = (vehicle?.name || "").toLowerCase();
+    if (name.includes('bmw')) return '/cars/bmw.jpg';
+    if (name.includes('swift')) return '/cars/swift.jpg';
+    if (name.includes('baleno')) return '/cars/baleno.jpg';
+    if (name.includes('thar')) return '/cars/thar.jpg';
+    if (name.includes('nexon')) return '/cars/nexon.jpg';
+    if (name.includes('city')) return '/cars/city.jpg';
+    if (name.includes('creta')) return '/cars/creta.jpg';
+    if (name.includes('fortuner')) return '/cars/fortuner.jpg';
+    if (name.includes('innova')) return '/cars/innova.jpg';
+    if (name.includes('scorpio')) return '/cars/scorpio.jpg';
+    if (name.includes('alto')) return '/cars/alto.jpg';
+    if (name.includes('ertiga')) return '/cars/ertiga.jpg';
+    return '/cars/bmw.jpg';
+  };
+
   if (loading) return <div className="min-h-screen bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center"><div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div></div>;
   if (!vehicle) return <div className="p-8 text-center">Vehicle not found</div>;
 
@@ -101,7 +125,7 @@ const VehicleDetails = () => {
           <div className="lg:col-span-8 space-y-5">
             <div className="bg-white rounded-[24px] md:rounded-[32px] overflow-hidden shadow border">
               <div className="relative h-[320px] sm:h-[420px] md:h-[520px] bg-slate-100">
-                <img src={vehicle.images?.[0]} alt={vehicle.name} className="w-full h-full object-cover" />
+                <img src={getImageUrl()} alt={vehicle.name} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
                 <div className="absolute top-5 left-5 flex gap-2">
                   <span className="bg-white px-4 py-2 rounded-full text-[10px] font-black tracking-widest flex items-center gap-2 shadow-lg"><span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>{vehicle.status}</span>
