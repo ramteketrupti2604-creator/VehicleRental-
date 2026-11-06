@@ -4,7 +4,7 @@ import axios from 'axios';
 import './AdminDashboard.css';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL : 'https://vehicle-rental-backend-n8fa.onrender.com/api';
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -48,7 +48,7 @@ const AdminDashboard = () => {
         const [vRes, bRes, uRes] = await Promise.all([
           axios.get(`${API_URL}/vehicles`, { headers }).catch(()=>({data:[]})),
           axios.get(`${API_URL}/bookings`, { headers }).catch(()=>({data:[]})),
-          axios.get(`${API_URL}/admin/customers`, { headers }).catch(()=>({data:[]})),
+          axios.get(`${API_URL}/users`, { headers }).catch(()=>axios.get(`${API_URL}/admin/customers`, { headers })).catch(()=>({data:[]})),
         ]);
         const vehicles = Array.isArray(vRes.data)? vRes.data : vRes.data.vehicles || [];
         const bookings = Array.isArray(bRes.data)? bRes.data : bRes.data.bookings || [];
