@@ -24,14 +24,16 @@ router.post('/check-availability', auth, async (req, res) => {
     const returnD = new Date(eDate);
     const vehicle = await Vehicle.findById(vehicleId);
     if(!vehicle) return res.status(400).json({ available: false, message: "Vehicle not found" });
+    // ===== FIXED OVERLAPPING LOGIC - START =====
+    // Pehle wala $or logic galat tha - ab sirf pickupDate/returnDate se check hoga
+    // jo har booking me pakka hota hai. Oct wali booking Dec ko nahi rokegi.
     const overlapping = await Booking.findOne({
       vehicle: vehicleId,
       status: { $in: ['PENDING','CONFIRMED'] },
-      $or: [
-        { startDate: { $lt: returnD }, endDate: { $gt: pickup } },
-        { pickupDate: { $lt: returnD }, returnDate: { $gt: pickup } }
-      ]
+      pickupDate: { $lt: returnD },
+      returnDate: { $gt: pickup }
     });
+    // ===== FIXED OVERLAPPING LOGIC - END =====
     if (overlapping) return res.json({ available: false, message: `Not Available ${pickup.toDateString()} to ${returnD.toDateString()}` });
     const days = Math.ceil((returnD - pickup) / (1000*60*60*24)) || 1;
     res.json({ available: true, rentalDays: days, pricePerDay: vehicle.pricePerDay, totalAmount: days * vehicle.pricePerDay });
@@ -68,6 +70,15 @@ router.post('/', auth, async (req, res) => {
     if(!vehicleDoc) return res.status(404).json({ message: 'Vehicle not found' });
     const pickup = new Date(sDate);
     const returnD = new Date(eDate);
+    // ===== FIXED - POST me bhi same overlapping check add kiya =====
+    const overlapping = await Booking.findOne({
+      vehicle: vId,
+      status: { $in: ['PENDING','CONFIRMED'] },
+      pickupDate: { $lt: returnD },
+      returnDate: { $gt: pickup }
+    });
+    if (overlapping) return res.status(400).json({ message: `Not Available ${pickup.toDateString()} to ${returnD.toDateString()}` });
+    // ===== FIXED END =====
     const days = Math.ceil((returnD - pickup) / (1000*60*60*24)) || 1;
     let discount = 0; let coupon = null;
     if(couponCode){
