@@ -1,34 +1,55 @@
-const express = require('express');
-const helmet = require('helmet');
-const path = require('path');
-const app = express();
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import helmet from 'helmet';
+import cors from 'cors';
 
-// Security headers - ZAP ke 6 warnings isi se fix honge
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.disable('x-powered-by');
+app.set('etag', false);
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      "default-src": ["'self'"],
-      "script-src": ["'self'", "'unsafe-inline'"],
-      "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      "font-src": ["'self'", "https:", "data:"],
-      "img-src": ["'self'", "data:", "https:"],
-      "connect-src": ["'self'", "https://vehicle-rental-5eb2.vercel.app", "http://localhost:5000"]
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      fontSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https:", "http://localhost:5000", "https://vehicle-rental-backend-n8fa.onrender.com"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"]
     }
   },
-  crossOriginEmbedderPolicy: true,
-  crossOriginOpenerPolicy: true,
-  crossOriginResourcePolicy: false // images ke liye
+  crossOriginEmbedderPolicy: { policy: "credentialless" },
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
 }));
 
-// Hide X-Powered-By
-app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.removeHeader("X-Powered-By");
+  next();
+});
 
-app.use(express.static(path.join(__dirname, 'build')));
+app.use(cors());
+app.use(express.static(path.join(__dirname, 'build'), { maxAge: '1d', etag: true }));
 
-// React Router ke liye - Express 5 fix
-app.use((req, res) => {
+// FIX - Express 5 ke liye /* ki jagah ye use karo
+app.get('/{*any}', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
-const PORT = 3000;
-app.listen(PORT, () => console.log(`Frontend running with security headers on http://localhost:${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Frontend secure server running on http://localhost:${PORT}`);
+});

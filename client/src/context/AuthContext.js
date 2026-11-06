@@ -3,6 +3,8 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -26,7 +28,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
-    const { data } = await axios.post('http://localhost:5000/api/users/login', { email, password });
+    const { data } = await axios.post(`${API_URL}/users/login`, { email, password });
     
     
     const actualUser = data.user || data;
@@ -43,7 +45,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (name, email, phone, password) => {
-    const { data } = await axios.post('http://localhost:5000/api/users/register', { name, email, phone, password });
+    const { data } = await axios.post(`${API_URL}/users/register`, { name, email, phone, password });
     const actualUser = data.user || data;
     const actualToken = data.token || actualUser.token;
 
