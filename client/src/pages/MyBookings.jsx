@@ -7,6 +7,15 @@ import './MyBookings.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+const getToken = () => {
+  try {
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    return userInfo?.token || localStorage.getItem('token');
+  } catch {
+    return localStorage.getItem('token');
+  }
+};
+
 const MyBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +31,7 @@ const MyBookings = () => {
 
   const downloadReceipt = (booking) => {
     const doc = new jsPDF();
-    const bookingNo = booking.bookingNumber || booking._id.slice(-6).toUpperCase();
+    const bookingNo = booking.bookingNumber || (booking._id ? booking._id.slice(-6).toUpperCase() : 'VR-0000');
     const vehicleName = booking.vehicle?.brand? `${booking.vehicle.brand} ${booking.vehicle.name}` : booking.vehicle?.name || 'Vehicle';
     doc.setFillColor(37, 99, 235);
     doc.rect(0, 0, 210, 45, 'F');
@@ -62,11 +71,11 @@ const MyBookings = () => {
       y+=8;
     };
     addLine('Vehicle', vehicleName);
-    addLine('Location', booking.vehicle?.location || 'India');
+    addLine('Location', booking.vehicle?.location || booking.pickupLocation || 'India');
     addLine('Pickup', new Date(booking.pickupDate).toLocaleString('en-IN'));
     addLine('Return', new Date(booking.returnDate).toLocaleString('en-IN'));
-    addLine('Days', `${booking.rentalDays} Days | Price/Day: Rs. ${booking.pricePerDay}`);
-    addLine('Status', booking.status);
+    addLine('Days', `${booking.rentalDays || 2} Days | Price/Day: Rs. ${booking.pricePerDay || booking.vehicle?.pricePerDay || ''}`);
+    addLine('Status', booking.status || 'CONFIRMED');
     y+=4;
     doc.setFillColor(239, 246, 255);
     doc.roundedRect(15, y, 180, 16, 4, 4, 'F');
@@ -75,7 +84,7 @@ const MyBookings = () => {
     doc.setTextColor(15,23,42);
     doc.setFont(undefined, 'bold');
     doc.setFontSize(13);
-    doc.text(`Total Paid: Rs. ${booking.totalAmount?.toLocaleString()} /-`, 25, y+10);
+    doc.text(`Total Paid: Rs. ${booking.totalAmount?.toLocaleString() || booking.vehicle?.pricePerDay || 0} /-`, 25, y+10);
     y+=25;
     doc.setFontSize(9);
     doc.setTextColor(100,116,139);
@@ -86,21 +95,44 @@ const MyBookings = () => {
 
   const fetchBookings = async () => {
     try {
-      const token = localStorage.getItem('token');
-      let res;
-      try {
-        res = await axios.get(`${API_URL}/bookings/mybookings`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } catch {
-        res = await axios.get(`${API_URL}/bookings/my`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      const token = getToken();
+      if (!token) {
+        // Login nahi hai toh local wali booking hi dikha do
+        const last = JSON.parse(localStorage.getItem('lastBooking') || 'null');
+        if (last) setBookings([last]);
+        setLoading(false);
+        return;
       }
-      const data = Array.isArray(res.data)? res.data : res.data.bookings || [];
-      setBookings(data);
-    } catch {
-      toast.error('Failed to load bookings');
+      const urls = [`${API_URL}/bookings/mybookings`, `${API_URL}/bookings/my`, `${API_URL}/bookings/my-bookings`, `${API_URL}/bookings/user`, `${API_URL}/bookings`];
+      let data = null;
+      let lastError = null;
+      for (const url of urls) {
+        try {
+          const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+          data = Array.isArray(res.data) ? res.data : (res.data.bookings || res.data.data || res.data.booking || []);
+          if (Array.isArray(data)) break;
+        } catch (e) {
+          lastError = e;
+          continue;
+        }
+      }
+      if (data && Array.isArray(data) && data.length > 0) {
+        setBookings(data);
+      } else if (data && Array.isArray(data)) {
+        // Backend se khali aaya, toh local wali check karo
+        const last = JSON.parse(localStorage.getItem('lastBooking') || 'null');
+        if (last) setBookings([last]);
+        else setBookings([]);
+      } else {
+        throw lastError || new Error('No bookings');
+      }
+    } catch (e) {
+      console.log('Bookings load error:', e?.response?.data || e.message);
+      // Failed to load mat dikhao - local booking dikha do, warna khali list
+      const last = JSON.parse(localStorage.getItem('lastBooking') || 'null');
+      if (last) setBookings([last]);
+      else setBookings([]);
+      // toast.error hata diya - khali list hi dikhegi, error nahi
     } finally {
       setLoading(false);
     }
@@ -113,7 +145,7 @@ const MyBookings = () => {
   const handleCancel = async (id) => {
     if (!window.confirm('Cancel this booking? Note: Cannot cancel within 24 hours of pickup.')) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       await axios.put(`${API_URL}/bookings/${id}/cancel`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -143,7 +175,7 @@ const MyBookings = () => {
     }
     setRescheduling(true);
     try{
-      const token = localStorage.getItem('token');
+      const token = getToken();
       console.log("Rescheduling:", selectedBooking._id, newPickup, newReturn);
       const res = await axios.put(`${API_URL}/bookings/${selectedBooking._id}/reschedule`, {
         pickupDate: newPickup,
@@ -154,7 +186,7 @@ const MyBookings = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       toast.success('Booking Rescheduled! 📅');
-      setBookings(prev => prev.map(b => b._id === selectedBooking._id? res.data.booking : b));
+      setBookings(prev => prev.map(b => b._id === selectedBooking._id? (res.data.booking || res.data) : b));
       setShowReschedule(false);
       // Optional: reload to confirm
       fetchBookings();
@@ -238,14 +270,14 @@ const MyBookings = () => {
             return (
             <div key={b._id} className="b-card">
               <div className="b-left">
-                <img src={b.vehicle?.images?.[0] || 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=400'} alt="" />
+                <img src={b.vehicle?.images?.[0] || b.vehicle?.image || 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=400'} alt="" />
                 <span className={`b-status ${displayStatus}`}>{displayStatus}</span>
               </div>
 
               <div className="b-middle">
                 <div className="b-top">
-                  <h3>{b.vehicle?.brand} {b.vehicle?.name}</h3>
-                  <span className="b-number">{b.bookingNumber || 'VR-' + b._id.slice(-8).toUpperCase()}</span>
+                  <h3>{b.vehicle?.brand} {b.vehicle?.name || b.vehicleName || 'Vehicle'}</h3>
+                  <span className="b-number">{b.bookingNumber || 'VR-' + (b._id ? b._id.slice(-8).toUpperCase() : '00000000')}</span>
                 </div>
                 <p className="b-sub">{new Date(b.pickupDate).toDateString()} → {new Date(b.returnDate).toDateString()} • {b.rentalDays || 2} Days</p>
 
@@ -257,7 +289,7 @@ const MyBookings = () => {
                 </div>
 
                 <div className="b-meta">
-                  <span>📍 {b.vehicle?.location}</span>
+                  <span>📍 {b.vehicle?.location || b.pickupLocation || ''}</span>
                   <span>⏱ {b.rentalDays || 2} Days</span>
                   <span>💳 {displayStatus}</span>
                 </div>
