@@ -19,8 +19,16 @@ export default function AdminCategories() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
-  const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-  const token = localStorage.getItem('token');
+  const API = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL : 'https://vehicle-rental-backend-n8fa.onrender.com/api';
+  const getToken = () => {
+    try {
+      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+      return userInfo?.token || localStorage.getItem('token');
+    } catch {
+      return localStorage.getItem('token');
+    }
+  };
+  const token = getToken();
   const config = { headers: { Authorization: `Bearer ${token}` } };
 
   const showToast = (msg, type = 'error') => {
