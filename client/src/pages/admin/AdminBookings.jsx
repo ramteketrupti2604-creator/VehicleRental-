@@ -8,8 +8,16 @@ export default function AdminBookings() {
   const [filter, setFilter] = useState('ALL');
   const [search, setSearch] = useState('');
 
-  const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-  const token = localStorage.getItem('token');
+  const API = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL : 'https://vehicle-rental-backend-n8fa.onrender.com/api';
+  const getToken = () => {
+    try {
+      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+      return userInfo?.token || localStorage.getItem('token');
+    } catch {
+      return localStorage.getItem('token');
+    }
+  };
+  const token = getToken();
   const config = { headers: { Authorization: `Bearer ${token}` } };
 
   const fetchBookings = async () => {
@@ -42,7 +50,7 @@ export default function AdminBookings() {
     return bookings.filter(b => {
       const okStatus = filter === 'ALL' || b.status === filter;
       const q = search.toLowerCase();
-      const okSearch = (b.bookingNumber + ' ' + (b.user?.name||'') + ' ' + (b.vehicle?.name||'') + ' ' + (b.user?.email||'')).toLowerCase().includes(q);
+      const okSearch = ((b.bookingNumber || '') + ' ' + (b.user?.name||'') + ' ' + (b.vehicle?.name||'') + ' ' + (b.user?.email||'')).toLowerCase().includes(q);
       return okStatus && okSearch;
     });
   }, [bookings, filter, search]);
