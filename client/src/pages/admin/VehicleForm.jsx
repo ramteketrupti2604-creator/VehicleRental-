@@ -13,18 +13,52 @@ const VehicleForm = () => {
   });
 
   useEffect(() => {
-    if(id) getVehicleById(id).then(data => setFormData({...data, features: data.features.join(', ')}));
+    if(id) {
+      getVehicleById(id).then(data => {
+        if(!data) return;
+        setFormData({
+          name: data.name || '',
+          brand: data.brand || '',
+          model: data.model || '',
+          category: data.category?.name || data.category || 'SUV',
+          registrationNumber: data.registrationNumber || '',
+          year: data.year || 2024,
+          fuelType: data.fuelType || 'Petrol',
+          transmission: data.transmission || 'Manual',
+          seats: data.seats || 5,
+          pricePerDay: data.pricePerDay || '',
+          location: data.location || '',
+          description: data.description || '',
+          features: Array.isArray(data.features) ? data.features.join(', ') : (data.features || ''),
+          status: data.status || 'AVAILABLE'
+        });
+      }).catch(err => {
+        console.log(err);
+        toast.error('Vehicle load nahi hua');
+      });
+    }
   }, [id]);
 
   const handleChange = (e) => setFormData({...formData, [e.target.name]: e.target.value});
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = {...formData, features: formData.features.split(',').map(f => f.trim())};
-    if(id) await updateVehicle(id, payload);
-    else await createVehicle(payload);
-    toast.success(`Vehicle ${id ? 'Updated' : 'Created'}`);
-    navigate('/admin/vehicles');
+    try {
+      const payload = {
+        ...formData,
+        features: formData.features ? formData.features.split(',').map(f => f.trim()).filter(Boolean) : [],
+        pricePerDay: Number(formData.pricePerDay),
+        seats: Number(formData.seats),
+        year: Number(formData.year)
+      };
+      if(id) await updateVehicle(id, payload);
+      else await createVehicle(payload);
+      toast.success(`Vehicle ${id ? 'Updated' : 'Created'}`);
+      navigate('/admin/vehicles');
+    } catch (err) {
+      console.log(err);
+      toast.error(err.response?.data?.message || 'Save failed - backend check karo');
+    }
   };
 
   return (
