@@ -5,7 +5,15 @@ import Coupon from "../models/couponModel.js";
 import asyncHandler from "express-async-handler";
 import { sendBookingEmail } from "../utils/sendEmail.js";
 
-// CREATE BOOKING
+
+const LOCAL_COUPONS = {
+  'WELCOME10': { type: 'PERCENT', value: 10 },
+  'FLAT200': { type: 'FLAT', value: 200 },
+  'FLAT500': { type: 'FLAT', value: 500 },
+  'FIRST50': { type: 'PERCENT', value: 50 },
+};
+
+
 const createBooking = asyncHandler(async (req, res) => {
   const { vehicle, pickupDate, returnDate, pickupLocation, couponCode } = req.body;
 
@@ -55,21 +63,37 @@ const createBooking = asyncHandler(async (req, res) => {
 
   let discount = 0;
   let couponData = null;
+  let isLocalCoupon = false;
+  let finalCouponCode = null;
   if (couponCode) {
-    couponData = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
-    if (!couponData) {
-      res.status(400);
-      throw new Error("Invalid coupon code");
-    }
-    if (new Date(couponData.expiryDate) < new Date()) {
-      res.status(400);
-      throw new Error("Coupon expired");
-    }
-    if (couponData.discountType === 'FLAT') {
-      discount = couponData.discountValue;
-    } else if (couponData.discountType === 'PERCENT') {
-      discount = (rentalDays * price * couponData.discountValue) / 100;
-      if (couponData.maxDiscount) discount = Math.min(discount, couponData.maxDiscount);
+    const codeUpper = couponCode.toUpperCase();
+    couponData = await Coupon.findOne({ code: codeUpper, isActive: true });
+    if (couponData) {
+      if (new Date(couponData.expiryDate) < new Date()) {
+        res.status(400);
+        throw new Error("Coupon expired");
+      }
+      if (couponData.discountType === 'FLAT') {
+        discount = couponData.discountValue;
+      } else if (couponData.discountType === 'PERCENT') {
+        discount = (rentalDays * price * couponData.discountValue) / 100;
+        if (couponData.maxDiscount) discount = Math.min(discount, couponData.maxDiscount);
+      }
+      finalCouponCode = couponData.code;
+    } else {
+     
+      const local = LOCAL_COUPONS[codeUpper];
+      if (!local) {
+        res.status(400);
+        throw new Error("Invalid coupon code");
+      }
+      isLocalCoupon = true;
+      finalCouponCode = codeUpper;
+      if (local.type === 'FLAT') {
+        discount = local.value;
+      } else if (local.type === 'PERCENT') {
+        discount = (rentalDays * price * local.value) / 100;
+      }
     }
   }
 
@@ -90,13 +114,13 @@ const createBooking = asyncHandler(async (req, res) => {
     totalAmount: (rentalDays * price) - discount,
     originalAmount: rentalDays * price,
     discount,
-    couponCode: couponData ? couponData.code : null,
+    couponCode: finalCouponCode,
     pickupLocation,
     status: "CONFIRMED",
     paymentStatus: "PENDING"
   });
 
-  if (couponData) {
+  if (couponData && !isLocalCoupon) {
     couponData.usedCount += 1;
     await couponData.save();
   }
@@ -187,7 +211,7 @@ const cancelBooking = asyncHandler(async (req, res) => {
   res.json({ message: "Booking cancelled successfully", booking });
 });
 
-// COMPLETE BOOKING - FINAL FIX FOR PAID ERROR
+
 const completeBooking = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id);
   if (!booking) {
