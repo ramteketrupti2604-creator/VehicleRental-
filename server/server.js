@@ -326,9 +326,13 @@ app.use((req, res) => {
   res.status(404).type('application/json').json({ message: "Resource not found" }); 
 });
 
-console.log("Connecting to MongoDB...");
-mongoose.connect(process.env.MONGO_URI)
-.then(() => {
+export default app;
+
+
+if (process.env.VERCEL !== '1') {
+  console.log("Connecting to MongoDB...");
+  mongoose.connect(process.env.MONGO_URI)
+  .then(() => {
     console.log('MongoDB Connected ✅');
     const PORT = process.env.PORT || 5000;
     const HOST = '0.0.0.0';
@@ -338,5 +342,7 @@ mongoose.connect(process.env.MONGO_URI)
       console.log(`Docs: http://localhost:${PORT}/api-docs`);
     });
   })
-.catch(err => { console.error("MongoDB Failed ❌:", err.message); });
-export default app;
+  .catch(err => { console.error("MongoDB Failed ❌:", err.message); });
+} else {
+  mongoose.connect(process.env.MONGO_URI).catch(e => console.error("MongoDB Failed ❌:", e.message));
+}
