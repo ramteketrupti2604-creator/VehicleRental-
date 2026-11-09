@@ -5,6 +5,19 @@ import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import './AddVehicle.css';
 
+
+const API_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) || process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+
+const DEFAULT_CATEGORIES = [
+  { _id: 'SUV', name: 'SUV' },
+  { _id: 'Sedan', name: 'Sedan' },
+  { _id: 'Hatchback', name: 'Hatchback' },
+  { _id: 'Luxury', name: 'Luxury' },
+  { _id: 'Bike', name: 'Bike' },
+  { _id: 'Electric', name: 'Electric' },
+];
+
 const AddVehicle = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -22,7 +35,7 @@ const AddVehicle = () => {
     features: '',
     status: 'AVAILABLE'
   });
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,15 +45,24 @@ const AddVehicle = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const { data } = await axios.get('http://localhost:5000/api/categories');
-        setCategories(Array.isArray(data)? data : data.categories || []);
+        const { data } = await axios.get(`${API_URL}/categories`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          timeout: 15000
+        });
+        const list = Array.isArray(data) ? data : data.categories || data.data || [];
+        if (list.length > 0) {
+          setCategories(list);
+        } else {
+          setCategories(DEFAULT_CATEGORIES);
+        }
       } catch (err) {
-        toast.error('Failed to fetch categories');
-        setCategories([]);
+        
+        console.log('Categories fetch failed, using default:', err.message);
+        setCategories(DEFAULT_CATEGORIES);
       }
     }
     fetchCategories();
-  }, []);
+  }, [token]);
 
   const handleChange = e => setFormData({...formData, [e.target.name]: e.target.value });
 
@@ -79,7 +101,7 @@ const AddVehicle = () => {
         payloadData.append('image', imageFile);
       }
 
-      await axios.post('http://localhost:5000/api/vehicles', payloadData, {
+      await axios.post(`${API_URL}/vehicles`, payloadData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -88,6 +110,7 @@ const AddVehicle = () => {
       toast.success('Vehicle Added Successfully!');
       navigate('/admin');
     } catch (err) {
+      console.log('Add Vehicle Error:', err.response?.data);
       toast.error(err.response?.data?.message || 'Failed to add vehicle');
     }
     setLoading(false);
@@ -168,13 +191,9 @@ const AddVehicle = () => {
             <label>Category *</label>
             <select name="category" value={formData.category} onChange={handleChange} required>
               <option value="">Select Category</option>
-              {Array.isArray(categories) && categories.length > 0? (
-                categories.map((cat) => (
-                  <option key={cat._id} value={cat._id}>{cat.name}</option>
-                ))
-              ) : (
-                <option disabled>No Categories Found</option>
-              )}
+              {categories.map((cat) => (
+                <option key={cat._id} value={cat._id}>{cat.name}</option>
+              ))}
             </select>
           </div>
 
