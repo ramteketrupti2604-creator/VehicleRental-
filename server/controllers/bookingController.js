@@ -5,14 +5,12 @@ import Coupon from "../models/couponModel.js";
 import asyncHandler from "express-async-handler";
 import { sendBookingEmail } from "../utils/sendEmail.js";
 
-
 const LOCAL_COUPONS = {
   'WELCOME10': { type: 'PERCENT', value: 10 },
   'FLAT200': { type: 'FLAT', value: 200 },
   'FLAT500': { type: 'FLAT', value: 500 },
   'FIRST50': { type: 'PERCENT', value: 50 },
 };
-
 
 const createBooking = asyncHandler(async (req, res) => {
   const { vehicle, pickupDate, returnDate, pickupLocation, couponCode } = req.body;
@@ -41,7 +39,8 @@ const createBooking = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Vehicle not found");
   }
-  if (vehicleDoc.status !== 'AVAILABLE') {
+  // FIX 1 - Pehle sirf 'AVAILABLE' bada wala check ho raha tha, ab chota-bada dono chalega
+  if (vehicleDoc.status && vehicleDoc.status.toUpperCase() !== 'AVAILABLE') {
     res.status(400);
     throw new Error(`Vehicle is ${vehicleDoc.status}, cannot be booked`);
   }
@@ -55,7 +54,7 @@ const createBooking = asyncHandler(async (req, res) => {
 
   if (overlapping) {
     res.status(400);
-    throw new Error(`Not available ${pickup.toDateString()} to ${returnD.toDateString()}`);
+    throw new Error(`Not available ${pickup.toDateString()} to ${returnD.toDateString()} - Ye gadi is date pe pehle se booked hai, dusri date ya dusri gadi try karo`);
   }
 
   const rentalDays = Math.ceil((returnD - pickup) / (1000 * 60 * 60 * 24)) || 1;
@@ -81,7 +80,6 @@ const createBooking = asyncHandler(async (req, res) => {
       }
       finalCouponCode = couponData.code;
     } else {
-     
       const local = LOCAL_COUPONS[codeUpper];
       if (!local) {
         res.status(400);
@@ -129,6 +127,7 @@ const createBooking = asyncHandler(async (req, res) => {
     .populate("vehicle", "name brand model pricePerDay images location")
     .populate("user", "name email phone");
 
+  // FIX 2 - Email ab booking ko nahi rokega. Fail bhi hua toh booking ho jayegi, server crash nahi hoga
   sendBookingEmail({
     to: pop.user.email,
     bookingNumber: pop.bookingNumber,
@@ -136,7 +135,7 @@ const createBooking = asyncHandler(async (req, res) => {
     pickupDate: new Date(pop.pickupDate).toDateString(),
     returnDate: new Date(pop.returnDate).toDateString(),
     totalAmount: pop.totalAmount
-  });
+  }).catch(err => console.log("Email failed, booking still done:", err.message));
 
   res.status(201).json(pop);
 });
@@ -210,7 +209,6 @@ const cancelBooking = asyncHandler(async (req, res) => {
 
   res.json({ message: "Booking cancelled successfully", booking });
 });
-
 
 const completeBooking = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id);
