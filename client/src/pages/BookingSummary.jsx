@@ -50,9 +50,8 @@ const BookingSummary = () => {
   const total = Math.max(subtotal - discount, 0);
   const locationQuery = vehicle.location || "Wardha, Maharashtra";
   const gmapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
-  // FIX 1 - MAP: Pehle Wardha pe fix tha, ab har location ka sahi map aayega - Google bina key wala
-  const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(locationQuery)}&output=embed`;
-  // Purana OSM wala rakha hai backup ke liye, delete nahi kiya
+  // OpenStreetMap - Google iframe block hota hai, ye kabhi block nahi hoga
+  // Wardha: lat 20.74, lon 78.60
   const osmSrc = `https://www.openstreetmap.org/export/embed.html?bbox=78.45%2C20.60%2C78.75%2C20.90&layer=mapnik&marker=20.7453%2C78.6022`;
   const osmLink = `https://www.openstreetmap.org/search?query=${encodeURIComponent(locationQuery)}`;
 
@@ -112,7 +111,6 @@ const BookingSummary = () => {
         navigate('/login');
         return;
       }
-      // FIX 2 - CONFIRMING: timeout lagaya taaki atak na jaye, 15 sec me jawab nahi aaya toh error dega
       const res = await axios.post(`${API_URL}/bookings`, {
         vehicle: vehicle._id,
         pickupDate,
@@ -121,14 +119,13 @@ const BookingSummary = () => {
         couponCode: appliedCode || undefined,
         totalAmount: total,
         discount: discount,
-      }, { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 });
+      }, { headers: { Authorization: `Bearer ${token}` } });
       localStorage.setItem('lastBooking', JSON.stringify(res.data.booking || res.data));
       toast.success('Booking Confirmed! 🎉');
       const bookingId = res.data.booking?._id || res.data._id;
       navigate(`/booking-confirmation/${bookingId}`, { state: res.data.booking || res.data });
     } catch (e) {
-      console.log("BOOKING ERROR:", e.message, e.response?.data);
-      toast.error(e.response?.data?.message || 'Booking failed - Server slow hai, dobara try karo');
+      toast.error(e.response?.data?.message || 'Booking failed - Dates overlapping');
     } finally { setLoading(false); }
   };
 
@@ -177,13 +174,13 @@ const BookingSummary = () => {
                 </div>
               </div>
 
-              {/* MAP - Google Map (Bina Key wala) */}
+              {/* MAP - OpenStreetMap (Google iframe block hota hai) */}
               <div className="mt-5 rounded-[20px] overflow-hidden border border-slate-200 shadow-sm">
                 <div className="bg-slate-900 text-white px-4 py-3 flex justify-between items-center">
                   <p className="text-[11px] font-black tracking-widest flex items-center gap-2"><Navigation size={14} className="text-blue-400"/> PICKUP LOCATION - {locationQuery.toUpperCase()}</p>
                   <a href={gmapLink} target="_blank" rel="noreferrer" className="bg-white text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-slate-100"><ExternalLink size={12}/> Open in Google Maps</a>
                 </div>
-                <iframe title="pickup-map" src={mapSrc} width="100%" height="300" style={{ border: 0 }} loading="lazy"></iframe>
+                <iframe title="pickup-map" src={osmSrc} width="100%" height="300" style={{ border: 0 }} loading="lazy"></iframe>
                 <div className="bg-[#f8fafc] px-4 py-2.5 flex items-center gap-2 text-[11px] text-slate-600"><MapPin size={12} className="text-blue-600"/><span className="font-bold">{locationQuery}</span><span className="text-slate-400">• Free pickup available • Live location verified</span></div>
               </div>
 
@@ -237,4 +234,4 @@ const BookingSummary = () => {
     </div>
   );
 };
-export default BookingSummary;
+export default BookingSummary; 
