@@ -16,7 +16,6 @@ const getToken = () => {
   }
 };
 
-// LOCAL COUPONS - Backend me ho ya na ho, ye hamesha chalenge
 const LOCAL_COUPONS = {
   'WELCOME10': { type: 'percent', value: 10 },
   'FLAT200': { type: 'flat', value: 200 },
@@ -50,17 +49,14 @@ const BookingSummary = () => {
   const total = Math.max(subtotal - discount, 0);
   const locationQuery = vehicle.location || "Wardha, Maharashtra";
   const gmapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
-  // OpenStreetMap - Google iframe block hota hai, ye kabhi block nahi hoga
-  // Wardha: lat 20.74, lon 78.60
-  const osmSrc = `https://www.openstreetmap.org/export/embed.html?bbox=78.45%2C20.60%2C78.75%2C20.90&layer=mapnik&marker=20.7453%2C78.6022`;
-  const osmLink = `https://www.openstreetmap.org/search?query=${encodeURIComponent(locationQuery)}`;
+  // FIX - Google Map Embed - Har city ka apna map dikhega
+  const osmSrc = `https://maps.google.com/maps?q=${encodeURIComponent(locationQuery + ', Maharashtra, India')}&output=embed`;
+  const osmLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
 
   const applyCoupon = async () => {
     if(!couponCode.trim()) return toast.error("Enter coupon code");
     const code = couponCode.trim().toUpperCase();
     setCouponLoading(true);
-
-    // STEP 1 - PEHLE LOCAL CHECK, BACKEND KA WAIT NAHI KARENGE
     const local = LOCAL_COUPONS[code];
     if (local) {
       const d = local.type === 'percent' ? Math.round(subtotal * local.value / 100) : local.value;
@@ -70,8 +66,6 @@ const BookingSummary = () => {
       toast.success(`${code} Applied! ₹${d} OFF`);
       return;
     }
-
-    // STEP 2 - Agar local me nahi hai toh Backend try karo
     try {
       const token = getToken();
       const res = await axios.post(`${API_URL}/coupons/validate`, {
@@ -119,13 +113,14 @@ const BookingSummary = () => {
         couponCode: appliedCode || undefined,
         totalAmount: total,
         discount: discount,
-      }, { headers: { Authorization: `Bearer ${token}` } });
+      }, { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 });
       localStorage.setItem('lastBooking', JSON.stringify(res.data.booking || res.data));
       toast.success('Booking Confirmed! 🎉');
       const bookingId = res.data.booking?._id || res.data._id;
       navigate(`/booking-confirmation/${bookingId}`, { state: res.data.booking || res.data });
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Booking failed - Dates overlapping');
+      console.log('Booking Error:', e.response?.data);
+      toast.error(e.response?.data?.message || e.message || 'Booking failed - Try again');
     } finally { setLoading(false); }
   };
 
@@ -174,7 +169,7 @@ const BookingSummary = () => {
                 </div>
               </div>
 
-              {/* MAP - OpenStreetMap (Google iframe block hota hai) */}
+              {/* MAP - Google Maps Embed */}
               <div className="mt-5 rounded-[20px] overflow-hidden border border-slate-200 shadow-sm">
                 <div className="bg-slate-900 text-white px-4 py-3 flex justify-between items-center">
                   <p className="text-[11px] font-black tracking-widest flex items-center gap-2"><Navigation size={14} className="text-blue-400"/> PICKUP LOCATION - {locationQuery.toUpperCase()}</p>
@@ -234,4 +229,4 @@ const BookingSummary = () => {
     </div>
   );
 };
-export default BookingSummary; 
+export default BookingSummary;
