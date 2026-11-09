@@ -7,30 +7,39 @@ import { format, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import { QRCodeCanvas } from 'qrcode.react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+const API_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) || process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+const getSavedBooking = () => {
+  try {
+    const saved = localStorage.getItem('lastBooking');
+    return saved ? JSON.parse(saved) : null;
+  } catch { return null; }
+};
 
 const BookingConfirmation = () => {
   const { id } = useParams();
   const location = useLocation();
   const { token } = useAuth();
-  const [booking, setBooking] = useState(location.state || JSON.parse(localStorage.getItem('lastBooking') || 'null'));
-  const [loading, setLoading] = useState(!location.state);
+  const [booking, setBooking] = useState(location.state || getSavedBooking());
+  const [loading, setLoading] = useState(!location.state && !getSavedBooking());
   const [paying, setPaying] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
 
   useEffect(() => {
     if (location.state) { setLoading(false); return; }
+    if (booking) { setLoading(false); return; }
     const load = async () => {
       try {
         if (!token) return;
         const { data } = await axios.get(`${API_URL}/bookings/${id}`, { headers: { Authorization: `Bearer ${token}` } });
         setBooking(data.booking || data);
       } catch {
-        const saved = localStorage.getItem('lastBooking');
-        if (saved) setBooking(JSON.parse(saved));
+        const saved = getSavedBooking();
+        if (saved) setBooking(saved);
       } finally { setLoading(false); }
     };
-    if (!booking) load(); else setLoading(false);
+    load();
   }, [id]);
 
   if (loading) return <div className="min-h-screen bg-blue-600 flex items-center justify-center"><div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin"></div></div>;
@@ -61,10 +70,8 @@ const BookingConfirmation = () => {
   return (
     <div className="min-h-[88vh] relative overflow-hidden flex items-center justify-center py-2 px-3">
       <div className="absolute inset-0 bg-gradient-to-br from-[#2563eb] via-[#3b82f6] to-[#1e3a8a]"></div>
-
       <div className="relative w-full max-w-[520px]">
         <div className="bg-white rounded-[22px] shadow-[0_20px_50px_rgba(0,0,0,0.25)] overflow-hidden">
-          {/* HEADER - HEIGHT KAM KIYA */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 flex items-center gap-3">
             <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shrink-0">
               <CheckCircle2 size={20} className="text-blue-600" strokeWidth={2.5} />
@@ -75,9 +82,7 @@ const BookingConfirmation = () => {
             </div>
             <div className="ml-auto bg-white text-blue-700 text-[8px] font-black tracking-widest px-2.5 py-1 rounded-full">✓ {booking.status || 'CONFIRMED'}</div>
           </div>
-
           <div className="p-3">
-            {/* BOOKING NUMBER */}
             <div className="bg-slate-900 text-white rounded-[12px] px-3.5 py-2.5 flex justify-between items-center">
               <div>
                 <p className="text-[7px] tracking-[1.5px] opacity-50 font-black">BOOKING NUMBER</p>
@@ -85,8 +90,6 @@ const BookingConfirmation = () => {
               </div>
               <button onClick={() => { navigator.clipboard.writeText(booking.bookingNumber); toast.success('Copied!'); }} className="bg-white/10 p-2 rounded-lg"><Copy size={12} /></button>
             </div>
-
-            {/* VEHICLE - HEIGHT KAM */}
             <div className="mt-2.5 flex gap-3 items-center bg-[#f0f6ff] border border-blue-100 rounded-[12px] p-2.5">
               <img src={booking.vehicle?.images?.[0]} className="w-12 h-12 rounded-[10px] object-cover border border-white shadow-sm" alt="" />
               <div className="flex-1 min-w-0">
@@ -98,8 +101,6 @@ const BookingConfirmation = () => {
                 <p className="font-black text-[11px]">₹{booking.totalAmount?.toLocaleString()}</p>
               </div>
             </div>
-
-            {/* DATES - COMPACT */}
             <div className="grid grid-cols-3 gap-1.5 mt-2.5">
               <div className="bg-white border border-slate-200 rounded-[10px] p-2.5">
                 <p className="text-[7px] font-black opacity-40">PICKUP</p>
@@ -117,13 +118,9 @@ const BookingConfirmation = () => {
                 <p className="text-[9px] opacity-80">{days}×₹{booking.pricePerDay}</p>
               </div>
             </div>
-
-            {/* PAYMENT - COMPACT */}
             <button onClick={handlePayment} disabled={paying || isPaid} className={`w-full mt-2.5 py-2.5 rounded-[10px] font-black text-[11px] flex items-center justify-center gap-1.5 ${isPaid? 'bg-green-600 text-white' : 'bg-gradient-to-r from-emerald-600 to-green-600 text-white'}`}>
               <CreditCard size={14} /> {isPaid? `✓ Paid ₹${booking.totalAmount}` : paying? 'Processing...' : `Pay Now ₹${booking.totalAmount}`}
             </button>
-
-            {/* QR CODE - HEIGHT BAHUT KAM KIYA */}
             <div className="mt-2.5 bg-slate-900 rounded-[12px] p-2.5 flex gap-3 items-center">
               <div className="bg-white rounded-[8px] p-1.5 shrink-0">
                 <QRCodeCanvas value={qrValue} size={60} bgColor="#ffffff" fgColor="#0f172a" level="H" />
@@ -134,8 +131,6 @@ const BookingConfirmation = () => {
                 <p className="text-[8px] font-bold bg-white/10 px-2 py-0.5 rounded-full mt-1 w-fit">{isPaid? 'PAID' : 'PENDING'}</p>
               </div>
             </div>
-
-            {/* BUTTONS - COMPACT */}
             <div className="flex gap-2 mt-2.5">
               <Link to="/my-bookings" className="flex-1 bg-slate-900 text-white py-2.5 rounded-[10px] font-black text-[11px] text-center flex items-center justify-center gap-1">
                 My Bookings <ArrowRight size={12} />
